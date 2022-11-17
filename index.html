@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script>if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(success, error);
+      } else {
+        alert("Your browser is out of fashion. There is no geo location!")
+      }
+    
+      function success(position) {
+        var latitude = position.coords.latitude;
+        var longitude = position.coords.longitude 
+        console.log(`Your latitude is ${latitude} and your longitude is ${longitude}`)
+          return (latitude, longitude);
+      }
+    
+      function error() {
+        alert("Can't detect your location. Try again later.")
+      };</script>
+</body>
+</html>
