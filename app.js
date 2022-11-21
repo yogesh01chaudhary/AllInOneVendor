@@ -3,6 +3,7 @@ const express = require("express");
 const app = express();
 require("dotenv/config");
 const router = require("./routes/vendor");
+const otp = require("./routes/otp");
 const fileupload = require("express-fileupload");
 const { connect } = require("./connection/dbConnection");
 const PORT = process.env.PORT;
@@ -10,6 +11,7 @@ app.use(express.json());
 app.use(fileupload());
 app.use(express.static(path.join(__dirname,'public')))
 app.use("/vendor", router);
+app.use("/vendor/otp", otp);
 connect();
 
 app.get("/", (req, res) => {

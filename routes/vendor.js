@@ -1,13 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const {
-  vendorRequest,
-  addPrice,
-  addPriceToSilver,
-  addPriceToGold,
-  addPriceToPlatinum,
-  addPackageToService,
-  getPopulatedService,
   loginVendor,
   verifyOTP,
   signUp,
@@ -18,27 +11,16 @@ const {
   requestForService,
   getVendorLocation,
   uploadProfilePhoto,
-  S3Url,
-  updateS3Url,
   updateImageUrl,
   deleteImageUrl,
   s3Url,
   s3Url1,
   nearByVendors,
   updateCoordinates,
+  confirmBooking,
 } = require("../controllers/vendor");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
-
-
-//**************************************NOT_IN_USE***************************************************************************//
-router.post("/vendorRequest", vendorRequest);
-router.post("/price", addPrice);
-router.post("/silver", addPriceToSilver);
-router.post("/gold", addPriceToGold);
-router.post("/platinum", addPriceToPlatinum);
-router.post("/package", addPackageToService);
-router.get("/service", getPopulatedService);
 
 //*************************************VENDOR*****************************************************************************************//
 //*************************************loginVendorByNumber****************************************************************************//
@@ -68,8 +50,7 @@ router.put("/serviceRequested", auth, isVendor, requestForService);
 router.post("/loginVendor2", loginVendor2);
 router.put("/updatePassword", auth, isVendor, updatePassword);
 
-//*************************************USERS******************************************************************************************//
-router.get("/nearByVendors", auth, isVendor, nearByVendors);
-router.get("/getVendorLocation",auth, isVendor, getVendorLocation);
+//*************************************booking*************************************************************************//
+router.put("/confirmBooking",auth,isVendor,confirmBooking)
 
 module.exports = router;

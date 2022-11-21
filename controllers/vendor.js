@@ -3,349 +3,17 @@ const path = require("path");
 const Joi = require("joi");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const { Service } = require("../models/servicesDummy");
-const { ServicePrice } = require("../models/servicePrice");
-const { ServiceCategory } = require("../models/serviceCategory");
 const axios = require("axios");
 const { createToken } = require("../helpers/refreshToken");
 const { v4: uuidv4 } = require("uuid");
 const AWS = require("aws-sdk");
 const { geocoder } = require("../helpers/geoCoder");
-
-// ************************************NOT_IN_USE************************************************************************************//
-exports.vendorRequest = async (req, res) => {
-  try {
-    const { body } = req;
-    const { error } = Joi.object()
-      .keys({
-        firstName: Joi.string().required(),
-        lastName: Joi.string().required(),
-        gender: Joi.string().required(),
-        phone: Joi.string().required(),
-        email: Joi.string().unique().required(),
-        fDOB: Joi.string().required(),
-        address: Joi.string().required(),
-        city: Joi.string().required(),
-        pin: Joi.number().required(),
-        requestStatus: Joi.string(),
-      })
-      .required()
-      .validate(body);
-
-    if (error) {
-      return res
-        .status(400)
-        .json({ success: false, message: error.details[0].message });
-    }
-    let vendor = new Vendor(body);
-    vendor = await vendor.save();
-    if (!vendor) {
-      return res
-        .statsu(400)
-        .send({ success: false, message: "Vendor not created successfully" });
-    }
-    res.status(200).send({
-      success: true,
-      message: "Request For Vendor created successfully",
-      vendor,
-    });
-  } catch (e) {
-    return res
-      .status(500)
-      .send({ success: false, message: "Something went wrong", error: e.name });
-  }
-};
-
-exports.getVendorTest = async (req, res) => {
-  res.status(200).send({ success: true, message: "Vendor Test" });
-};
-
-exports.addPrice = async (req, res) => {
-  try {
-    const { body } = req;
-    let servicePrice = await ServicePrice.findOneAndUpdate(
-      {
-        $and: [
-          { vendor: body.vendor },
-          { service: body.service },
-          { serviceType: body.serviceType },
-        ],
-      },
-      body,
-      { upsert: true, new: true }
-    );
-
-    return res.status(200).send({
-      success: true,
-      message: "Price Added Successfully",
-      servicePrice,
-    });
-  } catch (e) {
-    return res.status(500).send({
-      success: false,
-      message: "Something went wrong",
-      error: e.message,
-    });
-  }
-};
-
-exports.addPriceToSilver = async (req, res) => {
-  try {
-    const { body } = req;
-    console.log(body);
-    const silver = await ServicePrice.findOne({
-      $and: [
-        {
-          vendor: body.vendor,
-          service: body.service,
-          serviceType: body.serviceType,
-        },
-      ],
-    });
-    // console.log(silver);
-    if (!silver) {
-      return res.status(404).send({
-        success: false,
-        message: "Please add silver package for this service and vendor",
-      });
-    }
-    let serviceCategory = await ServiceCategory.findOneAndUpdate(
-      {
-        // vendor: body.vendor,
-        // service: body.service,
-        $and: [
-          {
-            vendor: body.vendor,
-          },
-          { service: body.service },
-        ],
-      },
-      {
-        vendor: body.vendor,
-        service: body.service,
-        silver: silver._id,
-      },
-      { upsert: true, new: true }
-    );
-    // await serviceCategory.save();
-    return res.status(200).send({
-      success: true,
-      message: "Price Added to Silver",
-      serviceCategory,
-    });
-  } catch (e) {
-    return res.status(500).send({
-      success: false,
-      message: "Something went wrong",
-      error: e.message,
-    });
-  }
-};
-
-exports.addPriceToGold = async (req, res) => {
-  try {
-    const { body } = req;
-    console.log(body);
-    const gold = await ServicePrice.findOne({
-      $and: [
-        {
-          vendor: body.vendor,
-          service: body.service,
-          serviceType: body.serviceType,
-        },
-      ],
-    });
-    console.log(gold);
-    if (!gold) {
-      return res.status(404).send({
-        success: false,
-        message: "Please add gold package for this service and vendor",
-      });
-    }
-
-    let serviceCategory = await ServiceCategory.findOneAndUpdate(
-      {
-        // vendor: body.vendor,
-        // service: body.service,
-        $and: [
-          {
-            vendor: body.vendor,
-          },
-          { service: body.service },
-        ],
-      },
-      {
-        vendor: body.vendor,
-        service: body.service,
-        gold: gold._id,
-      },
-      { upsert: true, new: true }
-    );
-    // await serviceCategory.save();
-    return res.status(200).send({
-      success: true,
-      message: "Price Added to Gold",
-      serviceCategory,
-    });
-  } catch (e) {
-    return res.status(500).send({
-      success: false,
-      message: "Something went wrong",
-      error: e.message,
-    });
-  }
-};
-
-exports.addPriceToPlatinum = async (req, res) => {
-  try {
-    const { body } = req;
-    // console.log(body);
-    const platinum = await ServicePrice.findOne({
-      $and: [
-        {
-          vendor: body.vendor,
-          service: body.service,
-          serviceType: body.serviceType,
-        },
-      ],
-    });
-    console.log(platinum);
-    if (!platinum) {
-      return res.status(404).send({
-        success: false,
-        message: "Please add platinum package for this service and vendor",
-      });
-    }
-
-    let serviceCategory = await ServiceCategory.findOneAndUpdate(
-      {
-        // vendor: body.vendor,
-        // service: body.service,
-        $and: [
-          {
-            vendor: body.vendor,
-          },
-          { service: body.service },
-        ],
-      },
-      {
-        vendor: body.vendor,
-        service: body.service,
-        platinum: platinum._id,
-      },
-      { upsert: true, new: true }
-    );
-    // await serviceCategory.save();
-    return res.status(200).send({
-      success: true,
-      message: "Price Added to Gold",
-      serviceCategory,
-    });
-  } catch (e) {
-    return res.status(500).send({
-      success: false,
-      message: "Something went wrong",
-      error: e.message,
-    });
-  }
-};
-
-exports.addPackageToService = async (req, res) => {
-  try {
-    const { body } = req;
-    // console.log(body);
-    let serviceCategory = await ServiceCategory.findOne({
-      $and: [
-        {
-          vendor: body.vendor,
-          service: body.service,
-        },
-      ],
-    });
-    // console.log(serviceCategory);
-    if (!serviceCategory) {
-      return res.status(404).send({
-        success: false,
-        message: "Please add package for this service and vendor",
-      });
-    }
-    // console.log(serviceCategory._id.toString());
-    let service = await Service.findOneAndUpdate(
-      {
-        _id: body.service,
-        serviceCategory: { $in: [serviceCategory._id.toString()] },
-      },
-      {
-        $addToSet: { serviceCategory: serviceCategory._id },
-      },
-      { upsert: true, new: true }
-    );
-    // await serviceCategory.save();
-    return res.status(200).send({
-      success: true,
-      message: "Package Added to Service",
-      service,
-    });
-  } catch (e) {
-    return res.status(500).send({
-      success: false,
-      message: "Something went wrong",
-      error: e.message,
-    });
-  }
-};
-
-exports.getPopulatedService = async (req, res) => {
-  try {
-    let service = await Service.find({}, { __v: 0 }).populate({
-      path: "serviceCategory",
-      model: "serviceCategory",
-      select: { __v: 0, service: 0 },
-      populate: [
-        // { path: "service", model: "service" ,select:{__v:0}},
-        { path: "vendor", model: "vendor", select: { firstName: 1 } },
-        {
-          path: "silver",
-          model: "servicePrice",
-          select: { __v: 0, service: 0, vendor: 0 },
-        },
-        {
-          path: "gold",
-          model: "servicePrice",
-          select: { __v: 0, service: 0, vendor: 0 },
-        },
-        {
-          path: "platinum",
-          model: "servicePrice",
-          select: { __v: 0, service: 0, vendor: 0 },
-        },
-      ],
-    });
-    if (!service) {
-      return res
-        .status(500)
-        .send({ success: false, message: "Something went wrong" });
-    }
-    if (service.length == 0) {
-      return res
-        .status(404)
-        .send({ success: true, message: "No Data Found", service });
-    }
-    return res.status(200).send({
-      success: true,
-      message: "All Services Fetched Successfully",
-      service,
-    });
-  } catch (e) {
-    return res
-      .staus(500)
-      .send({ success: false, message: "Something went wrong", error: e.name });
-  }
-};
+const Booking = require("../models/booking");
+const nodemailer = require("nodemailer");
 
 // ************************************Vendor************************************************************************************//
 //@desc login using number
-//@route GET/vendor/loginVendor
+//@route POST/vendor/loginVendor
 //@access Private
 exports.loginVendor = async (req, res) => {
   try {
@@ -364,10 +32,11 @@ exports.loginVendor = async (req, res) => {
         .status(400)
         .json({ success: false, message: error.details[0].message });
     }
+    // https://2factor.in/API/V1/API_KEY/SMS/PHONE_NUMBER/AUTOGEN
     const result = await axios.get(
       `https://2factor.in/API/V1/c7573668-cfde-11ea-9fa5-0200cd936042/SMS/${body.mobileNumber}/AUTOGEN`
     );
-    res.status(200).json({ success: true, result: result.data.Details });
+    res.status(200).json({ success: true, message: "OTP Sent Successfully" });
   } catch (e) {
     res
       .status(500)
@@ -376,7 +45,7 @@ exports.loginVendor = async (req, res) => {
 };
 
 //@desc verify OTP for vendor using number
-//@route GET/vendor/verifyOTP
+//@route POST/vendor/verifyOTP
 //@access Private
 exports.verifyOTP = async (req, res) => {
   try {
@@ -384,7 +53,6 @@ exports.verifyOTP = async (req, res) => {
 
     const verifySchema = Joi.object()
       .keys({
-        details: Joi.string().required(),
         otp: Joi.number().min(100000).max(999999).required(),
         mobileNumber: Joi.string()
           .regex(/^[6-9]{1}[0-9]{9}$/)
@@ -399,12 +67,20 @@ exports.verifyOTP = async (req, res) => {
     }
 
     try {
-      const { details, otp, mobileNumber } = body;
+      const { otp, mobileNumber } = body;
+      // https://2factor.in/API/V1/API_KEY/SMS/VERIFY/SESSION_ID/OTP_VALUE
       const result = await axios.get(
-        `https://2factor.in/API/V1/c7573668-cfde-11ea-9fa5-0200cd936042/SMS/VERIFY/${details}/${otp}`
+        `https://2factor.in/API/V1/c7573668-cfde-11ea-9fa5-0200cd936042/SMS/VERIFY3/${mobileNumber}/${otp}`
       );
+
       if (result.data.Details === "OTP Expired") {
         return res.status(410).send({ success: false, message: "OTP Expired" });
+      }
+
+      if (result.data.Details !== "OTP Matched") {
+        return res
+          .status(401)
+          .send({ success: false, message: "OTP Not Matched" });
       }
 
       let vendor = await Vendor.findOne({ mobileNumber });
@@ -434,7 +110,7 @@ exports.verifyOTP = async (req, res) => {
       let refreshToken = await createToken(vendor);
       return res.status(200).send({
         success: true,
-        message: "Vendor already exists",
+        message: "Welcome Back",
         token,
         vendor,
         refreshToken,
@@ -857,99 +533,117 @@ exports.updatePassword = async (req, res) => {
   }
 };
 
-// *********************************************FOR_USER************************************************************************ //
-//@desc get nearby Vendors For Users
-//@route GET/vendor/nearByVendors
+//@desc admin send booking to nearbyvendors and vendor will confirm/transfer the booking
+//@route PUT vendor/confirmBooking
 //@access Private
-exports.nearByVendors = async (req, res) => {
-  try {
-    const { body, user } = req;
-    const { error } = Joi.object()
-      .keys({
-        longitude: Joi.number(),
-        latitude: Joi.number(),
-      })
-      .validate(body);
-    if (error) {
-      return res
-        .status(400)
-        .send({ success: false, message: error.details[0].message });
-    }
-    const vendor = await Vendor.findById({ _id: user.id });
-    if (!vendor) {
-      return res.status(404).send({
-        success: false,
-        message:
-          "No data found, id you are passing in token not exists,If you have logged in by your number please provide valid token otherwise login/signup first with your number",
-      });
-    }
-    let vendors = await Vendor.aggregate([
-      {
-        $geoNear: {
-          near: {
-            type: "Point",
-            coordinates: [
-              vendor.locCoordinates[0][0],
-              vendor.locCoordinates[0][1],
-            ],
+exports.confirmBooking = async (req, res) => {
+  const { body, user } = req;
+  const { error } = Joi.object()
+    .keys({
+      bookingId: Joi.string().required(),
+    })
+    .required()
+    .validate(body);
+  if (error) {
+    return res
+      .status(400)
+      .send({ success: false, message: error.details[0].message });
+  }
+  let matchQuery = {
+    $match: {
+      $and: [
+        { _id: mongoose.Types.ObjectId(body.bookingId) },
+        { bookingStatus: "Pending" },
+      ],
+    },
+  };
+
+  let data = await Booking.aggregate([
+    {
+      $facet: {
+        totalData: [
+          matchQuery,
+          { $project: { __v: 0 } },
+          {
+            $lookup: {
+              from: "users",
+              localField: "userId",
+              foreignField: "_id",
+              as: "userData",
+            },
           },
-          distanceField: "distance",
-          maxDistance: 7000000,
-          spherical: true,
-        },
+        ],
+        totalCount: [matchQuery, { $count: "count" }],
       },
-    ]);
+    },
+  ]);
 
-    if (!vendors) {
-      return res.status(400).send({
-        success: false,
-        message: "Something went wrong",
-      });
-    }
-    if (vendors.length === 0) {
-      return res.status(200).send({
-        success: true,
-        message: "No Nearest Vendors Found",
-      });
-    }
-    return res.status(200).send({
-      success: true,
-      message: "Nearest Vendors Fetched successfully",
-      vendor,
-    });
-  } catch (e) {
-    return res.status(500).send({ success: false, message: e.message });
-  }
-};
+  let result = data[0].totalData;
+  let count = data[0].totalCount;
 
-//@desc get nearby Vendors For Users
-//@route GET/vendor/getVendorLocation
-//@access Private
-exports.getVendorLocation = async (req, res) => {
-  try {
-    let vendors = await Vendor.aggregate([
-      {
-        $geoNear: {
-          near: { type: "Point", coordinates: [77.87571443846723, 28.2059068] },
-          distanceField: "dist.calculated",
-          query: { services: { $in: ["6344fab789347ca0288556d0"] } },
-          maxDistance: 2000,
-          spherical: true,
-        },
-      },
-    ]);
-    return res.status(200).send({
-      success: true,
-      message: "Nearest Vendors Fetched Succeessfully",
-      data: vendors,
-    });
-  } catch (e) {
-    return res.status(400).send({
-      success: false,
-      message: "Something went wrong",
-      error: e.message,
-    });
+  if (result.length === 0) {
+    return res.status(404).send({ success: false, message: "No Data Found" });
   }
+  result = result[0];
+  console.log(result);
+  if (!result.userData[0].email && !result.userData[0].phone) {
+    return res
+      .status(400)
+      .send({ success: false, mesage: "User Mail Id Or Phone Is Required" });
+  }
+
+  let booking = await Booking.findByIdAndUpdate(
+    body.bookingId,
+    {
+      bookingStatus: "Confirmed",
+      vendor: user.id,
+    },
+    { upsert: true, new: true }
+  );
+  if (!booking) {
+    return res
+      .status(400)
+      .send({ success: false, message: "Something went wrong" });
+  }
+
+  // send mail or sms to user to let him know that his booking is confirmed
+  let transporter = await nodemailer.createTransport({
+    service: process.env.SERVICE,
+    host: process.env.HOST,
+    port: process.env.PORTMAIL,
+    secure: false,
+    auth: {
+      user: process.env.USER,
+      pass: process.env.PASSWORD,
+    },
+  });
+
+  const mailResponse = await transporter.sendMail({
+    from: `"Yogesh Chaudhary" <${process.env.USER}>`,
+    to: `${result.userData[0].email}`,
+    subject: `OrderID ${body.bookingId} Status`,
+    text:
+      `Dear User, \n\n` +
+      `Your booking having booking id ${body.bookingId} is confirmed. \n\n` +
+      "This is a auto-generated email. Please do not reply to this email.\n\n" +
+      "Regards\n" +
+      "Yogesh Chaudhary\n\n",
+  });
+
+  if (!mailResponse) {
+    return res
+      .status(400)
+      .send({ success: true, message: "Something went wrong" });
+  }
+  if (mailResponse.accepted.length === 0) {
+    return res.status(400).send({ success: false, mailResponse });
+  }
+  return res.status(200).send({
+    success: true,
+    message: "Booking Confirmed",
+    booking,
+    mailResponse,
+  });
 };
 
 // *********************************************UPLOAD_IMAGE************************************************************************ //
@@ -957,6 +651,7 @@ exports.getVendorLocation = async (req, res) => {
 //@desc Upload profile photo express-fileupload
 //@route PUT/vendor/photo
 //@access Private
+//DON'T USE IT
 exports.uploadProfilePhoto = async (req, res) => {
   try {
     const { id } = req.user;
@@ -1049,6 +744,7 @@ exports.uploadProfilePhoto = async (req, res) => {
 //@desc get Signed Url S3
 //@route GET/vendor/s3Url
 //@access Private
+//DON'T USE IT
 exports.s3Url = async (req, res) => {
   try {
     const s3 = new AWS.S3({
@@ -1071,7 +767,7 @@ exports.s3Url = async (req, res) => {
   }
 };
 
-//@desc get s3Url
+//@desc get s3Url fro newOne and for update image check in DB imageUrl
 //@route GET/vendor/s3Url1
 //@access Private
 exports.s3Url1 = async (req, res) => {

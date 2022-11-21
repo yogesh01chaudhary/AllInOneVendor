@@ -71,6 +71,7 @@ const VendorSchema = new Schema(
     },
     transferStatus: {
       type: String,
+      enum:["unblock","block"],
       default: "unblock",
     },
     timeSlot: [
