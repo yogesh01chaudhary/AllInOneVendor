@@ -1,5 +1,42 @@
 const { Schema, model } = require("mongoose");
 const { geocoder } = require("../helpers/geoCoder");
+const TransferCount = require("./transferCount");
+
+// var mongoose = require("mongoose");
+
+var SlotSchema = new Schema(
+  {
+    start: String,
+    end: String,
+    bookingDate: String,
+    booked: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { _id: false }
+);
+var LeaveSchema = new Schema(
+  {
+    flag: {
+      type: Boolean,
+      default: false,
+    },
+    leaveDate: { type: String },
+  },
+  { _id: false }
+);
+var TransferCountSchema = new Schema(
+  {
+    count: {
+      type: Number,
+      default: 0,
+    },
+    createdAt: { type: Date, expires: "1m", default: Date.now },
+  },
+  { _id: false }
+);
+
 const VendorSchema = new Schema(
   {
     firstName: {
@@ -62,28 +99,15 @@ const VendorSchema = new Schema(
         type: Number,
       },
     },
-    requestStatus: {
-      type: String,
-      default: "pending",
-    },
-    transferCount: {
-      type: Number,
-    },
-    transferStatus: {
-      type: String,
-      enum:["unblock","block"],
-      default: "unblock",
-    },
-    timeSlot: [
-      {
-        start: String,
-        end: String,
-        booked: {
-          type: Boolean,
-          default: false,
-        },
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
       },
-    ],
+      coordinates: {
+        type: [Number],
+      },
+    },
     imageUrl: {
       type: String,
     },
@@ -122,26 +146,52 @@ const VendorSchema = new Schema(
         type: String,
       },
     },
+    requestStatus: {
+      type: String,
+      default: "pending",
+    },
+    timeSlot: [SlotSchema],
+    requestedService: [
+      {
+        type: String,
+      },
+    ],
     services: [
       {
         type: Schema.Types.ObjectId,
         ref: "service",
       },
     ],
-    requestedService: [
+
+    transferCount: TransferCountSchema,
+    transferredBookings: [
       {
-        type: String,
+        type: Schema.Types.ObjectId,
+        ref: "service",
       },
     ],
-    location: {
-      type: {
-        type: String,
-        enum: ["Point"],
-      },
-      coordinates: {
-        type: [Number],
-      },
+    onLeave: [LeaveSchema],
+    emergencyLeave:{
+      type:Boolean,
+      default:false
     },
+    duty:{
+      type:Boolean,
+      defaut:false
+    },
+    rating: [
+      {
+        userId: {
+          type: Schema.Types.ObjectId,
+        },
+        star: {
+          type: Number,
+        },
+        comments: {
+          type: String,
+        },
+      },
+    ],
   },
   { timestamps: true }
 );

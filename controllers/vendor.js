@@ -8,8 +8,6 @@ const { createToken } = require("../helpers/refreshToken");
 const { v4: uuidv4 } = require("uuid");
 const AWS = require("aws-sdk");
 const { geocoder } = require("../helpers/geoCoder");
-const Booking = require("../models/booking");
-const nodemailer = require("nodemailer");
 
 // ************************************Vendor************************************************************************************//
 //@desc login using number
@@ -68,7 +66,6 @@ exports.verifyOTP = async (req, res) => {
 
     try {
       const { otp, mobileNumber } = body;
-      // https://2factor.in/API/V1/API_KEY/SMS/VERIFY/SESSION_ID/OTP_VALUE
       const result = await axios.get(
         `https://2factor.in/API/V1/c7573668-cfde-11ea-9fa5-0200cd936042/SMS/VERIFY3/${mobileNumber}/${otp}`
       );
@@ -77,10 +74,11 @@ exports.verifyOTP = async (req, res) => {
         return res.status(410).send({ success: false, message: "OTP Expired" });
       }
 
-      if (result.data.Details !== "OTP Matched") {
+      console.log(result.data);
+      if (result.data.Details === "OTP Mismatch") {
         return res
           .status(401)
-          .send({ success: false, message: "OTP Not Matched" });
+          .send({ success: false, message: "OTP Mismatch" });
       }
 
       let vendor = await Vendor.findOne({ mobileNumber });
@@ -141,6 +139,7 @@ exports.signUp = async (req, res) => {
         gender: Joi.string().required(),
         alternateNumber: Joi.number(),
         emergencyNumber: Joi.number(),
+        email: Joi.string().email().required(),
         currentAddress: Joi.object().keys({
           address: Joi.string().required(),
           city: Joi.string().required(),
@@ -153,14 +152,6 @@ exports.signUp = async (req, res) => {
           state: Joi.string().required(),
           pin: Joi.number().required(),
         }),
-        email: Joi.string().email().required(),
-        timeSlot: Joi.array().items(
-          Joi.object().keys({
-            start: Joi.string(),
-            end: Joi.string(),
-            booked: Joi.boolean(),
-          })
-        ),
         longitude: Joi.number(),
         latitude: Joi.number(),
       })
@@ -175,8 +166,7 @@ exports.signUp = async (req, res) => {
     if (!vendor) {
       return res.status(404).send({
         success: false,
-        message:
-          "No data found, id you are passing in token not exists,If you have logged in by your number please provide valid token otherwise login/signup first with your number",
+        message: "No Vendor Found",
       });
     }
 
@@ -206,68 +196,6 @@ exports.signUp = async (req, res) => {
       });
   } catch (e) {
     res.status(500).send({ success: false, message: e.message });
-  }
-};
-
-//@desc update the vendors verification
-//@route PUT/vendor/aadharVerification
-//@access Private
-exports.aadharVerification = async (req, res) => {
-  try {
-    const { id } = req.user;
-    const { body } = req;
-    const { error } = Joi.object()
-      .keys({
-        aadharFront: Joi.string().required(),
-        aadharBack: Joi.string().required(),
-        selfie1: Joi.string().required(),
-        selfie2: Joi.string().required(),
-        pancard: Joi.string().required(),
-      })
-      .required()
-      .validate(body);
-    if (error) {
-      return res
-        .status(400)
-        .send({ success: false, message: error.details[0].message });
-    }
-    const vendor = await Vendor.findByIdAndUpdate(
-      id,
-      {
-        verification: {
-          aadharFront: body.aadharFront,
-          aadharBack: body.aadharBack,
-          selfie1: body.selfie1,
-          selfie2: body.selfie2,
-          pancard: body.pancard,
-        },
-      },
-      { new: true }
-    );
-    if (!vendor) {
-      return res.status(200).send({
-        success: true,
-        message:
-          "No data found, id you are passing in token not exists,If you have logged in by your number please provide valid token otherwise login/signup first with your number",
-      });
-    }
-
-    vendor
-      .save()
-      .then(async (vendor) => {
-        return res.status(200).send({
-          success: true,
-          message: "Vendor saved successfully",
-          vendor,
-        });
-      })
-      .catch((e) => {
-        return res
-          .status(400)
-          .send({ success: false, message: "Vendor not saved" });
-      });
-  } catch (e) {
-    res.status(500).send({ success: false, message: e.name });
   }
 };
 
@@ -309,25 +237,15 @@ exports.addBankAccountDetails = async (req, res) => {
     if (!vendor) {
       return res.status(200).send({
         success: true,
-        message:
-          "No data found, id you are passing in token not exists,If you have logged in by your number please provide valid token otherwise login/signup first with your number",
+        message: "No vendor Found",
       });
     }
 
-    vendor
-      .save()
-      .then(async (vendor) => {
-        return res.status(200).send({
-          success: true,
-          message: "Vendor saved successfully",
-          vendor,
-        });
-      })
-      .catch((e) => {
-        return res
-          .status(400)
-          .send({ success: false, message: "Vendor not saved" });
-      });
+    return res.status(200).send({
+      success: true,
+      message: "Vendor saved successfully",
+      vendor,
+    });
   } catch (e) {
     res.status(500).send({ success: false, message: e.name });
   }
@@ -447,7 +365,10 @@ exports.loginVendor2 = async (req, res) => {
         message: "Invalid credentials,Email Incorrect",
       });
     }
-    const isPasswordMatched = await bcrypt.compare(password, vendor.password);
+    console.log("hi",vendor.password)
+    console.log("hii",password)
+    const isPasswordMatched =  bcrypt.compare(password, vendor.password);
+    console.log(isPasswordMatched)
     if (!isPasswordMatched) {
       return res.status(400).send({
         success: false,
@@ -468,7 +389,7 @@ exports.loginVendor2 = async (req, res) => {
     return res.status(400).send({
       success: false,
       message: "Something went wrong",
-      error: e.name,
+      error: e.message,
     });
   }
 };
@@ -499,7 +420,7 @@ exports.updatePassword = async (req, res) => {
         .send({ success: false, message: "No Vendor Exists" });
     }
 
-    const isPasswordMatched = await bcrypt.compare(password, vendor.password);
+    const isPasswordMatched = bcrypt.compare(password, vendor.password);
 
     if (!isPasswordMatched) {
       return res.status(400).send({
@@ -531,119 +452,6 @@ exports.updatePassword = async (req, res) => {
       error: e.message,
     });
   }
-};
-
-//@desc admin send booking to nearbyvendors and vendor will confirm/transfer the booking
-//@route PUT vendor/confirmBooking
-//@access Private
-exports.confirmBooking = async (req, res) => {
-  const { body, user } = req;
-  const { error } = Joi.object()
-    .keys({
-      bookingId: Joi.string().required(),
-    })
-    .required()
-    .validate(body);
-  if (error) {
-    return res
-      .status(400)
-      .send({ success: false, message: error.details[0].message });
-  }
-  let matchQuery = {
-    $match: {
-      $and: [
-        { _id: mongoose.Types.ObjectId(body.bookingId) },
-        { bookingStatus: "Pending" },
-      ],
-    },
-  };
-
-  let data = await Booking.aggregate([
-    {
-      $facet: {
-        totalData: [
-          matchQuery,
-          { $project: { __v: 0 } },
-          {
-            $lookup: {
-              from: "users",
-              localField: "userId",
-              foreignField: "_id",
-              as: "userData",
-            },
-          },
-        ],
-        totalCount: [matchQuery, { $count: "count" }],
-      },
-    },
-  ]);
-
-  let result = data[0].totalData;
-  let count = data[0].totalCount;
-
-  if (result.length === 0) {
-    return res.status(404).send({ success: false, message: "No Data Found" });
-  }
-  result = result[0];
-  console.log(result);
-  if (!result.userData[0].email && !result.userData[0].phone) {
-    return res
-      .status(400)
-      .send({ success: false, mesage: "User Mail Id Or Phone Is Required" });
-  }
-
-  let booking = await Booking.findByIdAndUpdate(
-    body.bookingId,
-    {
-      bookingStatus: "Confirmed",
-      vendor: user.id,
-    },
-    { upsert: true, new: true }
-  );
-  if (!booking) {
-    return res
-      .status(400)
-      .send({ success: false, message: "Something went wrong" });
-  }
-
-  // send mail or sms to user to let him know that his booking is confirmed
-  let transporter = await nodemailer.createTransport({
-    service: process.env.SERVICE,
-    host: process.env.HOST,
-    port: process.env.PORTMAIL,
-    secure: false,
-    auth: {
-      user: process.env.USER,
-      pass: process.env.PASSWORD,
-    },
-  });
-
-  const mailResponse = await transporter.sendMail({
-    from: `"Yogesh Chaudhary" <${process.env.USER}>`,
-    to: `${result.userData[0].email}`,
-    subject: `OrderID ${body.bookingId} Status`,
-    text:
-      `Dear User, \n\n` +
-      `Your booking having booking id ${body.bookingId} is confirmed. \n\n` +
-      "This is a auto-generated email. Please do not reply to this email.\n\n" +
-      "Regards\n" +
-      "Yogesh Chaudhary\n\n",
-  });
-
-  if (!mailResponse) {
-    return res
-      .status(400)
-      .send({ success: true, message: "Something went wrong" });
-  }
-  if (mailResponse.accepted.length === 0) {
-    return res.status(400).send({ success: false, mailResponse });
-  }
-  return res.status(200).send({
-    success: true,
-    message: "Booking Confirmed",
-    booking,
-    mailResponse,
-  });
 };
 
 // *********************************************UPLOAD_IMAGE************************************************************************ //
@@ -906,3 +714,817 @@ exports.deleteImageUrl = async (req, res) => {
     res.status(500).send({ success: false, message: e.message });
   }
 };
+
+// ******************************************AADHAR_VERIFICATION_IMAGE_UPLOAD******************************************************************************//
+//@desc update the vendors verification
+//@route PUT/vendor/aadharVerification
+//@access Private
+exports.aadharVerification = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const { body } = req;
+    const { error } = Joi.object()
+      .keys({
+        aadharFront: Joi.string().required(),
+        aadharBack: Joi.string().required(),
+        selfie1: Joi.string().required(),
+        selfie2: Joi.string().required(),
+        pancard: Joi.string().required(),
+      })
+      .required()
+      .validate(body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    const vendor = await Vendor.findByIdAndUpdate(
+      id,
+      {
+        verification: {
+          aadharFront: body.aadharFront,
+          aadharBack: body.aadharBack,
+          selfie1: body.selfie1,
+          selfie2: body.selfie2,
+          pancard: body.pancard,
+        },
+      },
+      { new: true }
+    );
+    if (!vendor) {
+      return res.status(200).send({
+        success: true,
+        message:
+          "No data found, id you are passing in token not exists,If you have logged in by your number please provide valid token otherwise login/signup first with your number",
+      });
+    }
+
+    vendor
+      .save()
+      .then(async (vendor) => {
+        return res.status(200).send({
+          success: true,
+          message: "Vendor saved successfully",
+          vendor,
+        });
+      })
+      .catch((e) => {
+        return res
+          .status(400)
+          .send({ success: false, message: "Vendor not saved" });
+      });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.name });
+  }
+};
+
+// ******************************************AADHAR_VERIFICATION_SELFIE_1******************************************************************************//
+//@desc get s3Url fro newOne and for update image check in DB imageUrl
+//@route GET/vendor/s3UrlSelfie1
+//@access Private
+exports.s3UrlSelfie1 = async (req, res) => {
+  try {
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+    const { id } = req.user;
+    let vendor = await Vendor.findById(id);
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    if (!vendor.verification.selfie1) {
+      const key = `${id}/${uuidv4()}.jpeg`;
+      const url = await s3.getSignedUrlPromise("putObject", {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        ContentType: "image/jpeg",
+        Key: key,
+        Expires: 120,
+      });
+      return res.status(200).send({
+        success: true,
+        message: "Url generated , imageUrl doesn't exists in DB",
+        url,
+        key,
+      });
+    }
+
+    let fileName = vendor.verification.selfie1.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    console.log("filename", fileName);
+    const key = `${fileName}`;
+    const url = await s3.getSignedUrlPromise("putObject", {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      ContentType: "image/jpeg",
+      Key: key,
+      Expires: 60,
+    });
+    return res
+      .status(200)
+      .send({ success: true, message: "Url generated", url, key });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+//@desc Upload imageUrl in DB using  S3
+//@route PUT/vendor/selfie1Url
+//@access Private
+exports.updateSelfie1Url = async (req, res) => {
+  try {
+    const { user, body } = req;
+    Joi.object()
+      .keys({
+        body: Joi.object().keys({
+          selfie1Url: Joi.string().required(),
+        }),
+        user: Joi.object().keys({
+          id: Joi.string().required(),
+        }),
+      })
+      .required()
+      .validate(req);
+    let vendor = await Vendor.findByIdAndUpdate(
+      user.id,
+      { 'verification.selfie1': body.selfie1Url },
+      { new: true }
+    );
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    return res
+      .status(200)
+      .send({ success: true, message: "Selfie1 Url Updated", vendor });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+//@desc delete image from s3 Bucket and DB
+//@route DELETE vendor/selfie1Url
+//@access Private
+exports.deleteSelfie1Url = async (req, res) => {
+  try {
+    const { id } = req.user;
+
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+
+    let fileName = req.body.selfie1Url.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    const key = `${fileName}`;
+    var params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
+    let vendor = await Vendor.findById(id);
+
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+
+    if (vendor.verification.selfie1 !== req.body.selfie1Url) {
+      return res.status(400).send({
+        success: false,
+        message:
+          "Can't be deleted selfie1Url doesn't match with Vendor's selfie1",
+      });
+    }
+
+    s3.deleteObject(params, async (err) => {
+      if (err)
+        return res.status(500).send({
+          success: false,
+          message: "Something went wrong",
+          error: err.message,
+        });
+      let vendor = await Vendor.findByIdAndUpdate(
+        id,
+        { 'verification.selfie1': "" },
+        { new: true }
+      );
+      return res
+        .status(200)
+        .send({ success: true, message: "Successfully Deleted", vendor });
+    });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+// ******************************************AADHAR_VERIFICATION_SELFIE_2******************************************************************************//
+//@desc get s3Url fro newOne and for update image check in DB imageUrl
+//@route GET/vendor/s3UrlSelfie2
+//@access Private
+exports.s3UrlSelfie2 = async (req, res) => {
+  try {
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+    const { id } = req.user;
+    let vendor = await Vendor.findById(id);
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    if (!vendor.verification.selfie2) {
+      const key = `${id}/${uuidv4()}.jpeg`;
+      const url = await s3.getSignedUrlPromise("putObject", {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        ContentType: "image/jpeg",
+        Key: key,
+        Expires: 120,
+      });
+      return res.status(200).send({
+        success: true,
+        message: "Url generated , imageUrl doesn't exists in DB",
+        url,
+        key,
+      });
+    }
+
+    let fileName = vendor.verification.selfie2.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    console.log("filename", fileName);
+    const key = `${fileName}`;
+    const url = await s3.getSignedUrlPromise("putObject", {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      ContentType: "image/jpeg",
+      Key: key,
+      Expires: 60,
+    });
+    return res
+      .status(200)
+      .send({ success: true, message: "Url generated", url, key });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+//@desc Upload imageUrl in DB using  S3
+//@route PUT/vendor/selfie2Url
+//@access Private
+exports.updateSelfie2Url = async (req, res) => {
+  try {
+    const { user, body } = req;
+    Joi.object()
+      .keys({
+        body: Joi.object().keys({
+          selfie2Url: Joi.string().required(),
+        }),
+        user: Joi.object().keys({
+          id: Joi.string().required(),
+        }),
+      })
+      .required()
+      .validate(req);
+    let vendor = await Vendor.findByIdAndUpdate(
+      user.id,
+      { 'verification.selfie2': body.selfie2Url },
+      { new: true }
+    );
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    return res
+      .status(200)
+      .send({ success: true, message: "Selfie2 Url Updated", vendor });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+//@desc delete image from s3 Bucket and DB
+//@route DELETE vendor/selfie2Url
+//@access Private
+exports.deleteSelfie2Url = async (req, res) => {
+  try {
+    const { id } = req.user;
+
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+
+    let fileName = req.body.selfie2Url.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    const key = `${fileName}`;
+    var params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
+    let vendor = await Vendor.findById(id);
+
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+
+    if (vendor.verification.selfie2 !== req.body.selfie2Url) {
+      return res.status(400).send({
+        success: false,
+        message:
+          "Can't be deleted selfie2Url doesn't match with Vendor's selfie2",
+      });
+    }
+
+    s3.deleteObject(params, async (err) => {
+      if (err)
+        return res.status(500).send({
+          success: false,
+          message: "Something went wrong",
+          error: err.message,
+        });
+      let vendor = await Vendor.findByIdAndUpdate(
+        id,
+        { 'verification.selfie2': "" },
+        { new: true }
+      );
+      return res
+        .status(200)
+        .send({ success: true, message: "Successfully Deleted", vendor });
+    });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+// ******************************************AADHAR_VERIFICATION_AADHAR_FRONT******************************************************************************//
+//@desc get s3Url fro newOne and for update image check in DB imageUrl
+//@route GET/vendor/s3UrlAadharFront
+//@access Private
+exports.s3UrlAadharFront = async (req, res) => {
+  try {
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+    const { id } = req.user;
+    let vendor = await Vendor.findById(id);
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    if (!vendor.verification.aadharFront) {
+      const key = `${id}/${uuidv4()}.jpeg`;
+      const url = await s3.getSignedUrlPromise("putObject", {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        ContentType: "image/jpeg",
+        Key: key,
+        Expires: 120,
+      });
+      return res.status(200).send({
+        success: true,
+        message: "Url generated , aadharFront doesn't exists in DB",
+        url,
+        key,
+      });
+    }
+
+    let fileName = vendor.verification.aadharFront.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    console.log("filename", fileName);
+    const key = `${fileName}`;
+    const url = await s3.getSignedUrlPromise("putObject", {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      ContentType: "image/jpeg",
+      Key: key,
+      Expires: 60,
+    });
+    return res
+      .status(200)
+      .send({ success: true, message: "Url generated", url, key });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+//@desc Upload imageUrl in DB using  S3
+//@route PUT/vendor/aadharFrontUrl
+//@access Private
+exports.updateAaadharFrontUrl = async (req, res) => {
+  try {
+    const { user, body } = req;
+    Joi.object()
+      .keys({
+        body: Joi.object().keys({
+          aadharFrontUrl: Joi.string().required(),
+        }),
+        user: Joi.object().keys({
+          id: Joi.string().required(),
+        }),
+      })
+      .required()
+      .validate(req);
+    let vendor = await Vendor.findByIdAndUpdate(
+      user.id,
+      { 'verification.aadharFront': body.aadharFrontUrl },
+      { new: true }
+    );
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    return res
+      .status(200)
+      .send({ success: true, message: "AadharFront Url Updated", vendor });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+//@desc delete image from s3 Bucket and DB
+//@route DELETE vendor/aadharFrontUrl
+//@access Private
+exports.deleteAadharFrontUrl = async (req, res) => {
+  try {
+    const { id } = req.user;
+
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+
+    let fileName = req.body.aadharFrontUrl.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    const key = `${fileName}`;
+    var params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
+    let vendor = await Vendor.findById(id);
+
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+
+    if (vendor.verification.aadharFront !== req.body.aadharFrontUrl) {
+      return res.status(400).send({
+        success: false,
+        message:
+          "Can't be deleted aadharFrontUrl doesn't match with Vendor's aadharFront",
+      });
+    }
+
+    s3.deleteObject(params, async (err) => {
+      if (err)
+        return res.status(500).send({
+          success: false,
+          message: "Something went wrong",
+          error: err.message,
+        });
+      let vendor = await Vendor.findByIdAndUpdate(
+        id,
+        { 'verification.aadharFront': "" },
+        { new: true }
+      );
+      return res
+        .status(200)
+        .send({ success: true, message: "Successfully Deleted", vendor });
+    });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+// ******************************************AADHAR_VERIFICATION_BACK******************************************************************************//
+//@desc get s3Url fro newOne and for update image check in DB imageUrl
+//@route GET/vendor/s3UrlAadharBack
+//@access Private
+exports.s3UrlAadharBack = async (req, res) => {
+  try {
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+    const { id } = req.user;
+    let vendor = await Vendor.findById(id);
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    if (!vendor.verification.aadharBack) {
+      const key = `${id}/${uuidv4()}.jpeg`;
+      const url = await s3.getSignedUrlPromise("putObject", {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        ContentType: "image/jpeg",
+        Key: key,
+        Expires: 120,
+      });
+      return res.status(200).send({
+        success: true,
+        message: "Url generated , aadharBack doesn't exists in DB",
+        url,
+        key,
+      });
+    }
+
+    let fileName = vendor.verification.aadharBack.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    console.log("filename", fileName);
+    const key = `${fileName}`;
+    const url = await s3.getSignedUrlPromise("putObject", {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      ContentType: "image/jpeg",
+      Key: key,
+      Expires: 60,
+    });
+    return res
+      .status(200)
+      .send({ success: true, message: "Url generated", url, key });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+//@desc Upload imageUrl in DB using  S3
+//@route PUT/vendor/aadharBackUrl
+//@access Private
+exports.updateAadharBackUrl = async (req, res) => {
+  try {
+    const { user, body } = req;
+    Joi.object()
+      .keys({
+        body: Joi.object().keys({
+          imageUrl: Joi.string().required(),
+        }),
+        user: Joi.object().keys({
+          id: Joi.string().required(),
+        }),
+      })
+      .required()
+      .validate(req);
+    let vendor = await Vendor.findByIdAndUpdate(
+      user.id,
+      {'verification.aadharBack': body.aadharBackUrl },
+      { new: true }
+    );
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    return res
+      .status(200)
+      .send({ success: true, message: "aadharBack Updated", vendor });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+//@desc delete image from s3 Bucket and DB
+//@route DELETE vendor/aadharBack
+//@access Private
+exports.deleteAadharBackUrl = async (req, res) => {
+  try {
+    const { id } = req.user;
+
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+
+    let fileName = req.body.aadharBackUrl.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    const key = `${fileName}`;
+    var params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
+    let vendor = await Vendor.findById(id);
+
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+
+    if (vendor.verification.aadharBack !== req.body.aadharBackUrl) {
+      return res.status(400).send({
+        success: false,
+        message:
+          "Can't be deleted aadharBackUrl doesn't match with Vendor's aadharBack",
+      });
+    }
+
+    s3.deleteObject(params, async (err) => {
+      if (err)
+        return res.status(500).send({
+          success: false,
+          message: "Something went wrong",
+          error: err.message,
+        });
+      let vendor = await Vendor.findByIdAndUpdate(
+        id,
+        { 'verification.aadharBack': "" },
+        { new: true }
+      );
+      return res
+        .status(200)
+        .send({ success: true, message: "Successfully Deleted", vendor });
+    });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+// ******************************************AADHAR_VERIFICATION_PANCARD******************************************************************************//
+//@desc get s3Url fro newOne and for update image check in DB imageUrl
+//@route GET/vendor/s3UrlPancard
+//@access Private
+exports.s3UrlPancard = async (req, res) => {
+  try {
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+    const { id } = req.user;
+    let vendor = await Vendor.findById(id);
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    if (!vendor.verification.pancard) {
+      const key = `${id}/${uuidv4()}.jpeg`;
+      const url = await s3.getSignedUrlPromise("putObject", {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        ContentType: "image/jpeg",
+        Key: key,
+        Expires: 120,
+      });
+      return res.status(200).send({
+        success: true,
+        message: "Url generated , pancard doesn't exists in DB",
+        url,
+        key,
+      });
+    }
+
+    let fileName = vendor.verification.pancard.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    console.log("filename", fileName);
+    const key = `${fileName}`;
+    const url = await s3.getSignedUrlPromise("putObject", {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      ContentType: "image/jpeg",
+      Key: key,
+      Expires: 60,
+    });
+    return res
+      .status(200)
+      .send({ success: true, message: "Url generated", url, key });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+//@desc Upload imageUrl in DB using  S3
+//@route PUT/vendor/pancardUrl
+//@access Private
+exports.updatePancardUrl = async (req, res) => {
+  try {
+    const { user, body } = req;
+    Joi.object()
+      .keys({
+        body: Joi.object().keys({
+          pancardUrl: Joi.string().required(),
+        }),
+        user: Joi.object().keys({
+          id: Joi.string().required(),
+        }),
+      })
+      .required()
+      .validate(req);
+    let vendor = await Vendor.findByIdAndUpdate(
+      user.id,
+      { 'verification.pancard': body.pancardUrl },
+      { new: true }
+    );
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    return res
+      .status(200)
+      .send({ success: true, message: "pancard Updated", vendor });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+//@desc delete image from s3 Bucket and DB
+//@route DELETE vendor/pancardUrl
+//@access Private
+exports.deletePancardUrl = async (req, res) => {
+  try {
+    const { id } = req.user;
+
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+
+    let fileName = req.body.pancardUrl.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    const key = `${fileName}`;
+    var params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
+    let vendor = await Vendor.findById(id);
+
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+
+    if (vendor.verification.pancard !== req.body.pancardUrl) {
+      return res.status(400).send({
+        success: false,
+        message:
+          "Can't be deleted pancardUrl doesn't match with Vendor's pancard",
+      });
+    }
+
+    s3.deleteObject(params, async (err) => {
+      if (err)
+        return res.status(500).send({
+          success: false,
+          message: "Something went wrong",
+          error: err.message,
+        });
+      let vendor = await Vendor.findByIdAndUpdate(
+        id,
+        {'verification.pancard': "" },
+        { new: true }
+      );
+      return res
+        .status(200)
+        .send({ success: true, message: "Successfully Deleted", vendor });
+    });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+//@desc update the vendor bankAccountDetails
+//@route PUT/vendor/timeSlot
+//@access Private
+exports.addTimeSlot = async (req, res) => {
+  try {
+    const { body,user } = req;
+    const { error } = Joi.object()
+      .keys({
+        timeSlot:Joi.array().items({
+          start:Joi.string().required(),
+          end:Joi.string().required(),
+          bookingDate:Joi.string()
+        })
+      })
+      .required()
+      .validate(body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    const vendor = await Vendor.findByIdAndUpdate(
+      user.id,
+      {
+        $addToSet:{timeSlot:{$each:body.timeSlot}}
+      },
+      { new: true }
+    );
+    if (!vendor) {
+      return res.status(200).send({
+        success: true,
+        message: "No vendor Found",
+      });
+    }
+
+    return res.status(200).send({
+      success: true,
+      message: "Vendor saved successfully with timeSlot",
+      vendor,
+    });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+

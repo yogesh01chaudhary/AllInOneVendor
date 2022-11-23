@@ -8,9 +8,8 @@ const BookingSchema = new Schema({
   },
   service: {
     type: Schema.Types.ObjectId,
-    ref: 'service',
+    ref: "service",
   },
-
   item: {
     packageId: {
       type: Schema.Types.ObjectId,
@@ -31,10 +30,6 @@ const BookingSchema = new Schema({
   total: {
     type: Number,
   },
-  vendor: {
-    type: Schema.Types.ObjectId,
-    ref: "Vendor",
-  },
   timeSlot: {
     start: {
       type: String,
@@ -42,6 +37,19 @@ const BookingSchema = new Schema({
     end: {
       type: String,
     },
+    bookingDate: {
+      type: String,
+    },
+  },
+  vendor: {
+    type: Schema.Types.ObjectId,
+    ref: "Vendor",
+  },
+  startTime: {
+    type: String,
+  },
+  endTime: {
+    type: String,
   },
   bookingStatus: {
     type: String,

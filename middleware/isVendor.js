@@ -3,7 +3,7 @@ const { Vendor } = require("../models/vendor");
 exports.isVendor = async (req, res, next) => {
   try {
     const { id } = req.user;
-    const vendor = await Vendor.findById({ _id: id });
+    const vendor = await Vendor.findById(id);
     if (!vendor) {
       return res.status(200).send({ success: true, message: "Not Vendor" });
     }
