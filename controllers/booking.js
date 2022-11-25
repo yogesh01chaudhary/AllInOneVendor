@@ -3,11 +3,146 @@ const Joi = require("joi");
 const Booking = require("../models/booking");
 const nodemailer = require("nodemailer");
 const mongoose = require("mongoose");
+const TransferCount = require("../models/transferCount");
 
 //@desc admin send booking to nearbyvendors and vendor will confirm the booking
 //@route PUT vendor/booking/confirmBooking
 //@access Private
 exports.confirmBooking = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const { body, user } = req;
+    const { error } = Joi.object()
+      .keys({
+        bookingId: Joi.string().required(),
+      })
+      .required()
+      .validate(body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    let matchQuery = {
+      $match: {
+        $and: [
+          { _id: mongoose.Types.ObjectId(body.bookingId) },
+          { bookingStatus: "Pending" },
+        ],
+      },
+    };
+
+    let data = await Booking.aggregate([
+      {
+        $facet: {
+          totalData: [
+            matchQuery,
+            { $project: { __v: 0 } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: "userData",
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    let result = data[0].totalData;
+    if (result.length === 0) {
+      return res.status(404).send({ success: false, message: "No Data Found" });
+    }
+    result = result[0];
+    if (!result.userData[0].email && !result.userData[0].phone) {
+      return res
+        .status(400)
+        .send({ success: false, mesage: "User Mail Id Or Phone Is Required" });
+    }
+
+    let booking = await Booking.findByIdAndUpdate(
+      body.bookingId,
+      {
+        bookingStatus: "Confirmed",
+        vendor: user.id,
+      },
+      { upsert: true, new: true, session }
+    );
+    if (!booking) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Something went wrong" });
+    }
+    let vendor = await Vendor.findByIdAndUpdate(
+      user.id,
+      { $addToSet: { bookings: new mongoose.Types.ObjectId(body.bookingId) } },
+      { upsert: true, new: true, session }
+    );
+    if (!vendor) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Something went wrong" });
+    }
+
+    // send mail or sms to user to let him know that his booking is confirmed
+    let transporter = await nodemailer.createTransport({
+      service: process.env.SERVICE,
+      host: process.env.HOST,
+      port: process.env.PORTMAIL,
+      secure: false,
+      auth: {
+        user: process.env.USER,
+        pass: process.env.PASSWORD,
+      },
+    });
+
+    const mailResponse = await transporter.sendMail({
+      from: `"Yogesh Chaudhary" <${process.env.USER}>`,
+      to: `${result.userData[0].email}`,
+      subject: `OrderID ${body.bookingId} Status`,
+      text:
+        `Dear User, \n\n` +
+        `Your booking having booking id ${body.bookingId} is confirmed. \n\n` +
+        "This is a auto-generated email. Please do not reply to this email.\n\n" +
+        "Regards\n" +
+        "Yogesh Chaudhary\n\n",
+    });
+
+    if (!mailResponse) {
+      return res
+        .status(400)
+        .send({ success: true, message: "Something went wrong" });
+    }
+    if (mailResponse.accepted.length === 0) {
+      return res.status(400).send({ success: false, mailResponse });
+    }
+    await session.commitTransaction();
+    await session.endSession();
+    return res.status(200).send({
+      success: true,
+      message: "Booking Confirmed",
+      booking,
+      vendor,
+      mailResponse,
+    });
+  } catch (e) {
+    await session.abortTransaction();
+    await session.endSession();
+    return res.status(400).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
+//@desc admin send booking to nearbyvendors and vendor will transfer the booking and admin will hit api to find nearby vendors and then vendors will confirm/transfer
+//@route PUT vendor/booking/transferBooking
+//@access Private
+exports.transferBooking = async (req, res) => {
   try {
     const { body, user } = req;
     const { error } = Joi.object()
@@ -52,128 +187,11 @@ exports.confirmBooking = async (req, res) => {
     let result = data[0].totalData;
 
     if (result.length === 0) {
-      return res.status(404).send({ success: false, message: "No Data Found" });
+      return res
+        .status(404)
+        .send({ success: false, message: "Booking Not Found" });
     }
     result = result[0];
-    if (!result.userData[0].email && !result.userData[0].phone) {
-      return res
-        .status(400)
-        .send({ success: false, mesage: "User Mail Id Or Phone Is Required" });
-    }
-
-    let booking = await Booking.findByIdAndUpdate(
-      body.bookingId,
-      {
-        bookingStatus: "Confirmed",
-        vendor: user.id,
-      },
-      { upsert: true, new: true }
-    );
-    if (!booking) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Something went wrong" });
-    }
-
-    // send mail or sms to user to let him know that his booking is confirmed
-    let transporter = await nodemailer.createTransport({
-      service: process.env.SERVICE,
-      host: process.env.HOST,
-      port: process.env.PORTMAIL,
-      secure: false,
-      auth: {
-        user: process.env.USER,
-        pass: process.env.PASSWORD,
-      },
-    });
-
-    const mailResponse = await transporter.sendMail({
-      from: `"Yogesh Chaudhary" <${process.env.USER}>`,
-      to: `${result.userData[0].email}`,
-      subject: `OrderID ${body.bookingId} Status`,
-      text:
-        `Dear User, \n\n` +
-        `Your booking having booking id ${body.bookingId} is confirmed. \n\n` +
-        "This is a auto-generated email. Please do not reply to this email.\n\n" +
-        "Regards\n" +
-        "Yogesh Chaudhary\n\n",
-    });
-
-    if (!mailResponse) {
-      return res
-        .status(400)
-        .send({ success: true, message: "Something went wrong" });
-    }
-    if (mailResponse.accepted.length === 0) {
-      return res.status(400).send({ success: false, mailResponse });
-    }
-    return res.status(200).send({
-      success: true,
-      message: "Booking Confirmed",
-      booking,
-      mailResponse,
-    });
-  } catch (e) {
-    return res.status(400).send({
-      success: false,
-      message: "Something went wrong",
-      error: e.message,
-    });
-  }
-};
-
-//@desc admin send booking to nearbyvendors and vendor will transfer the booking and admin will hit api to find nearby vendors and then vendors will confirm/transfer
-//@route PUT vendor/booking/transferBooking
-//@access Private
-exports.transferBooking = async (req, res) => {try {
-    const { body, user } = req;
-      const { error } = Joi.object()
-        .keys({
-          bookingId: Joi.string().required(),
-        })
-        .required()
-        .validate(body);
-      if (error) {
-        return res
-          .status(400)
-          .send({ success: false, message: error.details[0].message });
-      }
-      let matchQuery = {
-        $match: {
-          $and: [
-            { _id: mongoose.Types.ObjectId(body.bookingId) },
-            { bookingStatus: "Pending" },
-          ],
-        },
-      };
-
-      let data = await Booking.aggregate([
-        {
-          $facet: {
-            totalData: [
-              matchQuery,
-              { $project: { __v: 0 } },
-              {
-                $lookup: {
-                  from: "users",
-                  localField: "userId",
-                  foreignField: "_id",
-                  as: "userData",
-                },
-              },
-            ],
-          },
-        },
-      ]);
-
-      let result = data[0].totalData;
-
-      if (result.length === 0) {
-        return res
-          .status(404)
-          .send({ success: false, message: "Booking Not Found" });
-      }
-      result = result[0];
 
     let vendor = await Vendor.findById(user.id);
     if (!vendor) {
@@ -181,12 +199,19 @@ exports.transferBooking = async (req, res) => {try {
         .status(400)
         .send({ success: false, message: "Vendor Not Found" });
     }
-    console.log(vendor.transferCount);
     if (!vendor.transferCount) {
+      let transferCount = new TransferCount({ vendor: user.id, count: 1 });
+      transferCount = await transferCount.save();
+      if (!transferCount) {
+        return res.status(400).send({
+          success: false,
+          message: "Something went wrong in transfer count ",
+        });
+      }
       vendor = await Vendor.findByIdAndUpdate(
         user.id,
         {
-          "transferCount.count": 1,
+          transferCount: transferCount._id,
           $addToSet: { transferredBookings: body.bookingId },
         },
         { new: true }
@@ -197,12 +222,21 @@ exports.transferBooking = async (req, res) => {try {
         vendor,
       });
     }
-    console.log(vendor.transferCount.count);
-    if (vendor.transferCount.count !== 3) {
+    let transferCount = await TransferCount.findById(vendor.transferCount);
+    if (!transferCount) {
+      let transferCount = new TransferCount({ vendor: user.id, count: 1 });
+      transferCount = await transferCount.save();
+      if (!transferCount) {
+        return res.status(400).send({
+          success: false,
+          message: "Something went wrong in transfer count ",
+        });
+      }
       vendor = await Vendor.findByIdAndUpdate(
         user.id,
         {
-          "transferCount.count": vendor.transferCount.count + 1,
+          transferCount: transferCount._id,
+          $addToSet: { transferredBookings: body.bookingId },
         },
         { new: true }
       );
@@ -212,28 +246,44 @@ exports.transferBooking = async (req, res) => {try {
         vendor,
       });
     }
-    return res
-      .status(200)
-      .send({
+    if (transferCount.count !== 3) {
+      vendor = await TransferCount.findByIdAndUpdate(
+        vendor.transferCount,
+        {
+          count: transferCount.count + 1,
+        },
+        { new: true }
+      );
+      return res.status(200).send({
         success: true,
-        message:
-          "Your Account Is Blocked You Have Reached Maximum Transfer Limit",
+        message: "Transfer",
         vendor,
       });
+    }
+    return res.status(200).send({
+      success: true,
+      message:
+        "Your Account Is Blocked You Have Reached Maximum Transfer Limit",
+      vendor,
+    });
   } catch (e) {
     return res.status(400).send({
       success: false,
       message: "Something went wrong",
       error: e.message,
     });
-  }};
+  }
+};
 
 //@desc admin send booking to nearbyvendors and vendor will confirm the booking
 //@route PUT vendor/booking/complete
 //@access Private
 exports.completeBooking = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
+    session.startTransaction();
     const { body, user } = req;
+    console.log(body, user);
     const { error } = Joi.object()
       .keys({
         bookingId: Joi.string().required(),
@@ -250,7 +300,7 @@ exports.completeBooking = async (req, res) => {
         $and: [
           { _id: mongoose.Types.ObjectId(body.bookingId) },
           { bookingStatus: "Confirmed" },
-          { vendor: user.id },
+          { vendor: mongoose.Types.ObjectId(user.id) },
         ],
       },
     };
@@ -291,8 +341,32 @@ exports.completeBooking = async (req, res) => {
       {
         bookingStatus: "Completed",
       },
-      { new: true }
+      { new: true, session }
     );
+    let vendor = await Vendor.findOneAndUpdate(
+        {
+          _id: mongoose.Types.ObjectId(user.id),
+          // bookings: { $all: [{ $elemMatch: { bookingId: body.bookingId } }] },
+        },
+        {
+          $set: {
+            // "bookings.$[elem].startTime": Date.now() + 60 * 60 * 24 * 1000,
+              "bookings.$[elem].endTime": Date.now(),
+          },
+        },
+        {
+          arrayFilters: [
+            { "elem.bookingId": mongoose.Types.ObjectId(body.bookingId) },
+          ],
+          new: true,session
+        }
+      );
+      if (!vendor) {
+        return res
+          .status(404)
+          .send({ success: false, message: "Something went wrong" });
+      }
+      
 
     // send mail or sms to user to let him know that his booking is confirmed
     let transporter = await nodemailer.createTransport({
@@ -326,13 +400,18 @@ exports.completeBooking = async (req, res) => {
     if (mailResponse.accepted.length === 0) {
       return res.status(400).send({ success: false, mailResponse });
     }
+    await session.commitTransaction();
+    await session.endSession();
     return res.status(200).send({
       success: true,
       message: "Booking Completed",
       booking,
+      vendor,
       mailResponse,
     });
   } catch (e) {
+    await session.commitTransaction();
+    await session.endSession();
     return res.status(400).send({
       success: false,
       message: "Something went wrong",
@@ -695,7 +774,7 @@ exports.deleteProductUrl = async (req, res) => {
 // TESTING
 //@desc admin send booking to nearbyvendors and vendor will transfer the booking and admin will hit api to find nearby vendors and then vendors will confirm/transfer
 //@route PUT vendor/booking/transferCount
-//@access Private 
+//@access Private
 exports.transferCount = async (req, res) => {
   try {
     const { body, user } = req;
@@ -753,12 +832,20 @@ exports.transferCount = async (req, res) => {
         .status(400)
         .send({ success: false, message: "Vendor Not Found" });
     }
-    console.log(vendor.transferCount);
+    // console.log(vendor.transferCount);
     if (!vendor.transferCount) {
+      let transferCount = new TransferCount({ vendor: user.id, count: 1 });
+      transferCount = await transferCount.save();
+      if (!transferCount) {
+        return res.status(400).send({
+          success: false,
+          message: "Something went wrong in transfer count ",
+        });
+      }
       vendor = await Vendor.findByIdAndUpdate(
         user.id,
         {
-          "transferCount.count": 1,
+          transferCount: transferCount._id,
           $addToSet: { transferredBookings: body.bookingId },
         },
         { new: true }
@@ -769,12 +856,22 @@ exports.transferCount = async (req, res) => {
         vendor,
       });
     }
-    console.log(vendor.transferCount.count);
-    if (vendor.transferCount.count !== 3) {
+    // console.log(vendor.transferCount);
+    let transferCount = await TransferCount.findById(vendor.transferCount);
+    if (!transferCount) {
+      let transferCount = new TransferCount({ vendor: user.id, count: 1 });
+      transferCount = await transferCount.save();
+      if (!transferCount) {
+        return res.status(400).send({
+          success: false,
+          message: "Something went wrong in transfer count ",
+        });
+      }
       vendor = await Vendor.findByIdAndUpdate(
         user.id,
         {
-          "transferCount.count": vendor.transferCount.count + 1,
+          transferCount: transferCount._id,
+          $addToSet: { transferredBookings: body.bookingId },
         },
         { new: true }
       );
@@ -784,16 +881,111 @@ exports.transferCount = async (req, res) => {
         vendor,
       });
     }
-    return res
-      .status(200)
-      .send({
+    if (transferCount.count !== 3) {
+      vendor = await TransferCount.findByIdAndUpdate(
+        vendor.transferCount,
+        {
+          count: transferCount.count + 1,
+        },
+        { new: true }
+      );
+      return res.status(200).send({
         success: true,
-        message:
-          "Your Account Is Blocked You Have Reached Maximum Transfer Limit",
+        message: "Transfer",
         vendor,
       });
+    }
+    return res.status(200).send({
+      success: true,
+      message:
+        "Your Account Is Blocked You Have Reached Maximum Transfer Limit",
+      vendor,
+    });
   } catch (e) {
     return res.status(400).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
+exports.bookingStartTime = async (req, res) => {
+  try {
+    const { body, user } = req;
+    const { error } = Joi.object()
+      .keys({
+        bookingId: Joi.string().required(),
+      })
+      .required()
+      .validate(body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    let matchQuery = {
+      $match: {
+        $and: [
+          { _id: mongoose.Types.ObjectId(body.bookingId) },
+          { bookingStatus: "Confirmed" },
+        ],
+      },
+    };
+
+    let data = await Booking.aggregate([
+      {
+        $facet: {
+          totalData: [
+            matchQuery,
+            { $project: { __v: 0 } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: "userData",
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    let result = data[0].totalData;
+
+    if (result.length === 0) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Booking Not Found" });
+    }
+    result = result[0];
+    let vendor = await Vendor.findOneAndUpdate(
+      {
+        _id: mongoose.Types.ObjectId(user.id),
+        // bookings: { $all: [{ $elemMatch: { bookingId: body.bookingId } }] },
+      },
+      {
+        $set: {
+          "bookings.$[elem].startTime": Date.now() + 60 * 60 * 24 * 1000,
+          //   "bookings.$[elem].endTime": Date.now(),
+        },
+      },
+      {
+        arrayFilters: [
+          { "elem.bookingId": mongoose.Types.ObjectId(body.bookingId) },
+        ],
+        new: true,
+      }
+    );
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Something went wrong" });
+    }
+    return res.status(200).send({ success: true, vendor });
+  } catch (e) {
+    return res.status(500).send({
       success: false,
       message: "Something went wrong",
       error: e.message,

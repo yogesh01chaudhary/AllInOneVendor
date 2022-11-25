@@ -18,25 +18,41 @@ var SlotSchema = new Schema(
 );
 var LeaveSchema = new Schema(
   {
-    flag: {
-      type: Boolean,
-      default: false,
+    date: {
+      type: String,
     },
-    leaveDate: { type: String },
+    status: {
+      type: String,
+      enum: ["Pending", "Approved", "Disapproved", "Applied"],
+      default: "Pending",
+    },
   },
   { _id: false }
 );
-var TransferCountSchema = new Schema(
+var EmergencyLeaveSchema = new Schema(
   {
-    count: {
-      type: Number,
-      default: 0,
+    date: {
+      type: String,
     },
-    createdAt: { type: Date, expires: "1m", default: Date.now },
+    status: {
+      type: String,
+      enum: ["Pending", "Approved", "Disapproved", "Applied"],
+      default: "Pending",
+    },
   },
   { _id: false }
 );
-
+var BookingDutySchema = new Schema({
+  bookingId: {
+    type: Schema.Types.ObjectId,
+  },
+  startTime: {
+    type: String,
+  },
+  endTime: {
+    type: String,
+  },
+});
 const VendorSchema = new Schema(
   {
     firstName: {
@@ -150,7 +166,6 @@ const VendorSchema = new Schema(
       type: String,
       default: "pending",
     },
-    timeSlot: [SlotSchema],
     requestedService: [
       {
         type: String,
@@ -162,23 +177,30 @@ const VendorSchema = new Schema(
         ref: "service",
       },
     ],
-
-    transferCount: TransferCountSchema,
     transferredBookings: [
       {
         type: Schema.Types.ObjectId,
         ref: "service",
       },
     ],
+    transferCount: {
+      type: Schema.Types.ObjectId,
+      ref: "transferCount",
+    },
+    bookings: [BookingDutySchema],
+    timeSlot: [SlotSchema],
     onLeave: [LeaveSchema],
-    emergencyLeave:{
-      type:Boolean,
-      default:false
-    },
-    duty:{
-      type:Boolean,
-      defaut:false
-    },
+    emergencyLeave: [EmergencyLeaveSchema],
+    
+    onDuty: [
+      {
+        status: Boolean,
+        loginTime: String,
+        logoutTime: String,
+        date: String,
+      },
+      { _id: false },
+    ],
     rating: [
       {
         userId: {

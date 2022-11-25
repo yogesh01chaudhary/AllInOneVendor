@@ -365,10 +365,10 @@ exports.loginVendor2 = async (req, res) => {
         message: "Invalid credentials,Email Incorrect",
       });
     }
-    console.log("hi",vendor.password)
-    console.log("hii",password)
-    const isPasswordMatched =  bcrypt.compare(password, vendor.password);
-    console.log(isPasswordMatched)
+    console.log("hi", vendor.password);
+    console.log("hii", password);
+    const isPasswordMatched = bcrypt.compare(password, vendor.password);
+    console.log(isPasswordMatched);
     if (!isPasswordMatched) {
       return res.status(400).send({
         success: false,
@@ -716,68 +716,6 @@ exports.deleteImageUrl = async (req, res) => {
 };
 
 // ******************************************AADHAR_VERIFICATION_IMAGE_UPLOAD******************************************************************************//
-//@desc update the vendors verification
-//@route PUT/vendor/aadharVerification
-//@access Private
-exports.aadharVerification = async (req, res) => {
-  try {
-    const { id } = req.user;
-    const { body } = req;
-    const { error } = Joi.object()
-      .keys({
-        aadharFront: Joi.string().required(),
-        aadharBack: Joi.string().required(),
-        selfie1: Joi.string().required(),
-        selfie2: Joi.string().required(),
-        pancard: Joi.string().required(),
-      })
-      .required()
-      .validate(body);
-    if (error) {
-      return res
-        .status(400)
-        .send({ success: false, message: error.details[0].message });
-    }
-    const vendor = await Vendor.findByIdAndUpdate(
-      id,
-      {
-        verification: {
-          aadharFront: body.aadharFront,
-          aadharBack: body.aadharBack,
-          selfie1: body.selfie1,
-          selfie2: body.selfie2,
-          pancard: body.pancard,
-        },
-      },
-      { new: true }
-    );
-    if (!vendor) {
-      return res.status(200).send({
-        success: true,
-        message:
-          "No data found, id you are passing in token not exists,If you have logged in by your number please provide valid token otherwise login/signup first with your number",
-      });
-    }
-
-    vendor
-      .save()
-      .then(async (vendor) => {
-        return res.status(200).send({
-          success: true,
-          message: "Vendor saved successfully",
-          vendor,
-        });
-      })
-      .catch((e) => {
-        return res
-          .status(400)
-          .send({ success: false, message: "Vendor not saved" });
-      });
-  } catch (e) {
-    res.status(500).send({ success: false, message: e.name });
-  }
-};
-
 // ******************************************AADHAR_VERIFICATION_SELFIE_1******************************************************************************//
 //@desc get s3Url fro newOne and for update image check in DB imageUrl
 //@route GET/vendor/s3UrlSelfie1
@@ -849,7 +787,7 @@ exports.updateSelfie1Url = async (req, res) => {
       .validate(req);
     let vendor = await Vendor.findByIdAndUpdate(
       user.id,
-      { 'verification.selfie1': body.selfie1Url },
+      { "verification.selfie1": body.selfie1Url },
       { new: true }
     );
     if (!vendor) {
@@ -907,7 +845,7 @@ exports.deleteSelfie1Url = async (req, res) => {
         });
       let vendor = await Vendor.findByIdAndUpdate(
         id,
-        { 'verification.selfie1': "" },
+        { "verification.selfie1": "" },
         { new: true }
       );
       return res
@@ -990,7 +928,7 @@ exports.updateSelfie2Url = async (req, res) => {
       .validate(req);
     let vendor = await Vendor.findByIdAndUpdate(
       user.id,
-      { 'verification.selfie2': body.selfie2Url },
+      { "verification.selfie2": body.selfie2Url },
       { new: true }
     );
     if (!vendor) {
@@ -1048,7 +986,7 @@ exports.deleteSelfie2Url = async (req, res) => {
         });
       let vendor = await Vendor.findByIdAndUpdate(
         id,
-        { 'verification.selfie2': "" },
+        { "verification.selfie2": "" },
         { new: true }
       );
       return res
@@ -1131,7 +1069,7 @@ exports.updateAaadharFrontUrl = async (req, res) => {
       .validate(req);
     let vendor = await Vendor.findByIdAndUpdate(
       user.id,
-      { 'verification.aadharFront': body.aadharFrontUrl },
+      { "verification.aadharFront": body.aadharFrontUrl },
       { new: true }
     );
     if (!vendor) {
@@ -1189,7 +1127,7 @@ exports.deleteAadharFrontUrl = async (req, res) => {
         });
       let vendor = await Vendor.findByIdAndUpdate(
         id,
-        { 'verification.aadharFront': "" },
+        { "verification.aadharFront": "" },
         { new: true }
       );
       return res
@@ -1272,7 +1210,7 @@ exports.updateAadharBackUrl = async (req, res) => {
       .validate(req);
     let vendor = await Vendor.findByIdAndUpdate(
       user.id,
-      {'verification.aadharBack': body.aadharBackUrl },
+      { "verification.aadharBack": body.aadharBackUrl },
       { new: true }
     );
     if (!vendor) {
@@ -1330,7 +1268,7 @@ exports.deleteAadharBackUrl = async (req, res) => {
         });
       let vendor = await Vendor.findByIdAndUpdate(
         id,
-        { 'verification.aadharBack': "" },
+        { "verification.aadharBack": "" },
         { new: true }
       );
       return res
@@ -1413,7 +1351,7 @@ exports.updatePancardUrl = async (req, res) => {
       .validate(req);
     let vendor = await Vendor.findByIdAndUpdate(
       user.id,
-      { 'verification.pancard': body.pancardUrl },
+      { "verification.pancard": body.pancardUrl },
       { new: true }
     );
     if (!vendor) {
@@ -1471,7 +1409,7 @@ exports.deletePancardUrl = async (req, res) => {
         });
       let vendor = await Vendor.findByIdAndUpdate(
         id,
-        {'verification.pancard': "" },
+        { "verification.pancard": "" },
         { new: true }
       );
       return res
@@ -1488,14 +1426,14 @@ exports.deletePancardUrl = async (req, res) => {
 //@access Private
 exports.addTimeSlot = async (req, res) => {
   try {
-    const { body,user } = req;
+    const { body, user } = req;
     const { error } = Joi.object()
       .keys({
-        timeSlot:Joi.array().items({
-          start:Joi.string().required(),
-          end:Joi.string().required(),
-          bookingDate:Joi.string()
-        })
+        timeSlot: Joi.array().items({
+          start: Joi.string().required(),
+          end: Joi.string().required(),
+          bookingDate: Joi.string(),
+        }),
       })
       .required()
       .validate(body);
@@ -1507,7 +1445,7 @@ exports.addTimeSlot = async (req, res) => {
     const vendor = await Vendor.findByIdAndUpdate(
       user.id,
       {
-        $addToSet:{timeSlot:{$each:body.timeSlot}}
+        $addToSet: { timeSlot: { $each: body.timeSlot } },
       },
       { new: true }
     );
@@ -1528,3 +1466,84 @@ exports.addTimeSlot = async (req, res) => {
   }
 };
 
+exports.requestLeave = async (req, res) => {
+  try {
+    const { body, user } = req;
+    const { error } = Joi.object()
+      .keys({
+        onLeave: Joi.array().items(
+          Joi.object().keys({
+            date: Joi.string().required(),
+            status: Joi.string().required(),
+          })
+        ),
+      })
+      .required()
+      .validate(body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    const vendor = await Vendor.findByIdAndUpdate(
+      user.id,
+      {
+        $addToSet: { onLeave: { $each: body.onLeave } },
+      },
+      { new: true }
+    );
+    if (!vendor) {
+      return res.status(200).send({
+        success: true,
+        message: "No vendor Found",
+      });
+    }
+
+    return res.status(200).send({
+      success: true,
+      message: "Vendor Requested For leave",
+      vendor,
+    });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+exports.requestEmergencyLeave = async (req, res) => {
+  try {
+    const { body, user } = req;
+    const { error } = Joi.object()
+      .keys({
+        date: Joi.string().required(),
+        status: Joi.string().required(),
+      })
+      .required()
+      .validate(body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    const vendor = await Vendor.findByIdAndUpdate(
+      user.id,
+      {
+        $addToSet: { emergencyLeave: { date: body.date, status: body.status } },
+      },
+      { new: true }
+    );
+    if (!vendor) {
+      return res.status(200).send({
+        success: true,
+        message: "No vendor Found",
+      });
+    }
+
+    return res.status(200).send({
+      success: true,
+      message: "Vendor Requested For leave",
+      vendor,
+    });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};

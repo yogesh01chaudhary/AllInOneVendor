@@ -4,7 +4,6 @@ const {
   loginVendor,
   verifyOTP,
   signUp,
-  aadharVerification,
   addBankAccountDetails,
   loginVendor2,
   updatePassword,
@@ -31,6 +30,8 @@ const {
   deletePancardUrl,
   updatePancardUrl,
   addTimeSlot,
+  requestLeave,
+  requestEmergencyLeave,
 } = require("../controllers/vendor");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -56,8 +57,6 @@ router.put("/imageUrl", auth, isVendor, updateImageUrl);
 router.delete("/imageUrl", auth, isVendor, deleteImageUrl);
 
 //*************************************_AADHAR_VERIFICATION_PHOTO_UPLOAD***********************************************************************************//
-router.put("/aadharVerification", auth, isVendor, aadharVerification);
-
 //***********************************SELFIE_1***********************************************************************************//
 router.get("/s3UrlSelfie1", auth, isVendor, s3UrlSelfie1);
 router.put("/selfie1Url", auth, isVendor, updateSelfie1Url);
@@ -92,6 +91,9 @@ router.put("/updatePassword", auth, isVendor, updatePassword);
 
 //*************************************timeSlot*************************************************************************//
 router.put("/timeSlot", auth, isVendor, addTimeSlot);
+router.put("/requestEmergencyLeave", auth, isVendor, requestEmergencyLeave);
+router.put("/requestLeave", auth, isVendor, requestLeave);
+
 
 
 module.exports = router;
