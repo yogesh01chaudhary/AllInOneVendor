@@ -5,6 +5,7 @@ require("dotenv/config");
 const router = require("./routes/vendor");
 const otp = require("./routes/otp");
 const booking = require("./routes/booking");
+const category = require("./routes/category");
 const fileupload = require("express-fileupload");
 const { connect } = require("./connection/dbConnection");
 const PORT = process.env.PORT;
@@ -14,6 +15,7 @@ app.use(express.static(path.join(__dirname,'public')))
 app.use("/vendor", router);
 app.use("/vendor/otp", otp);
 app.use("/vendor/booking", booking);
+app.use("/vendor/category", category);
 connect();
 
 app.get("/", (req, res) => {

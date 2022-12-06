@@ -191,16 +191,16 @@ const VendorSchema = new Schema(
     timeSlot: [SlotSchema],
     onLeave: [LeaveSchema],
     emergencyLeave: [EmergencyLeaveSchema],
-    
+
     onDuty: [
       {
-        status: Boolean,
         loginTime: String,
         logoutTime: String,
         date: String,
       },
       { _id: false },
     ],
+    onDutyStatus: { type: Boolean, enum: [true, false], defualt: false },
     rating: [
       {
         userId: {

@@ -367,7 +367,7 @@ exports.loginVendor2 = async (req, res) => {
     }
     console.log("hi", vendor.password);
     console.log("hii", password);
-    const isPasswordMatched = bcrypt.compare(password, vendor.password);
+    const isPasswordMatched = await bcrypt.compare(password, vendor.password);
     console.log(isPasswordMatched);
     if (!isPasswordMatched) {
       return res.status(400).send({
@@ -1547,3 +1547,4 @@ exports.requestEmergencyLeave = async (req, res) => {
     res.status(500).send({ success: false, message: e.message });
   }
 };
+
