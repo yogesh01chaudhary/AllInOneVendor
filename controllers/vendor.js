@@ -8,6 +8,7 @@ const { createToken } = require("../helpers/refreshToken");
 const { v4: uuidv4 } = require("uuid");
 const AWS = require("aws-sdk");
 const { geocoder } = require("../helpers/geoCoder");
+const mongoose = require("mongoose");
 
 // ************************************Vendor************************************************************************************//
 //@desc login using number
@@ -1548,3 +1549,187 @@ exports.requestEmergencyLeave = async (req, res) => {
   }
 };
 
+exports.loginTime = async (req, res) => {
+  try {
+    const { body, user } = req;
+    // const { error } = Joi.object()
+    //   .keys({
+    //     bookingId: Joi.string().required(),
+    //   })
+    //   .required()
+    //   .validate(body);
+    // if (error) {
+    //   return res
+    //     .status(400)
+    //     .send({ success: false, message: error.details[0].message });
+    // }
+    // let matchQuery = {
+    //   $match: {
+    //     $and: [
+    //       { _id: mongoose.Types.ObjectId(body.bookingId) },
+    //       { bookingStatus: "Confirmed" },
+    //     ],
+    //   },
+    // };
+
+    // let data = await Booking.aggregate([
+    //   {
+    //     $facet: {
+    //       totalData: [
+    //         matchQuery,
+    //         { $project: { __v: 0 } },
+    //         {
+    //           $lookup: {
+    //             from: "users",
+    //             localField: "userId",
+    //             foreignField: "_id",
+    //             as: "userData",
+    //           },
+    //         },
+    //       ],
+    //     },
+    //   },
+    // ]);
+
+    // let result = data[0].totalData;
+
+    // if (result.length === 0) {
+    //   return res
+    //     .status(404)
+    //     .send({ success: false, message: "Booking Not Found" });
+    // }
+    // result = result[0];
+    let vendor = await Vendor.findOneAndUpdate(
+      {
+        _id: user.id,
+        onDutyStatus: false,
+      },
+      {
+        $addToSet: { onDuty: { loginTime: Date.now() } },
+        // "onDuty.loginTime": Date.now(),
+        onDutyStatus: true,
+        //   "bookings.$[elem].endTime": Date.now(),
+      },
+      {
+        // arrayFilters: [
+        //   { "elem.bookingId": mongoose.Types.ObjectId(body.bookingId) },
+        // ],
+        new: true,
+      }
+    );
+    if (!vendor) {
+      return res.status(404).send({
+        success: false,
+        message:
+          "May Be Vendor is onDuty Already Logged In or Vendor not found",
+      });
+    }
+    return res.status(200).send({
+      success: true,
+      onDutyStatus: vendor.onDutyStatus,
+      onDuty: vendor.onDuty,
+    });
+  } catch (e) {
+    return res.status(500).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
+exports.logoutTime = async (req, res) => {
+  try {
+    const { body, user } = req;
+    // const { error } = Joi.object()
+    //   .keys({
+    //     bookingId: Joi.string().required(),
+    //   })
+    //   .required()
+    //   .validate(body);
+    // if (error) {
+    //   return res
+    //     .status(400)
+    //     .send({ success: false, message: error.details[0].message });
+    // }
+    // let matchQuery = {
+    //   $match: {
+    //     $and: [
+    //       { _id: mongoose.Types.ObjectId(body.bookingId) },
+    //       { bookingStatus: "Confirmed" },
+    //     ],
+    //   },
+    // };
+
+    // let data = await Booking.aggregate([
+    //   {
+    //     $facet: {
+    //       totalData: [
+    //         matchQuery,
+    //         { $project: { __v: 0 } },
+    //         {
+    //           $lookup: {
+    //             from: "users",
+    //             localField: "userId",
+    //             foreignField: "_id",
+    //             as: "userData",
+    //           },
+    //         },
+    //       ],
+    //     },
+    //   },
+    // ]);
+
+    // let result = data[0].totalData;
+
+    // if (result.length === 0) {
+    //   return res
+    //     .status(404)
+    //     .send({ success: false, message: "Booking Not Found" });
+    // }
+    // result = result[0];
+
+    let vendor = await Vendor.findOneAndUpdate(
+      {
+        _id: user.id,
+        onDutyStatus: true,
+        // onDuty: {
+        //   loginTime: { $exists: true },
+        //   logoutTime: { $exists: false },
+        // },
+      },
+      {
+        // $addToSet: { onDuty: { logoutTime: Date.now() } },
+        // "onDuty.loginTime": Date.now(),
+        onDutyStatus: false,
+        "onDuty.$[elem].logoutTime": Date.now(),
+      },
+      {
+        arrayFilters: [
+          {
+            "elem.logoutTime": { $exists: false },
+          },
+        ],
+        new: true,
+      }
+    );
+    if (!vendor) {
+      return res.status(404).send({
+        success: false,
+        message:
+          "May Be Vendor is offDuty Already Logged Out or Vendor not found",
+      });
+    }
+    return res.status(200).send({
+      success: true,
+      onDutyStatus: vendor.onDutyStatus,
+      onDuty: vendor.onDuty,
+    });
+  } catch (e) {
+    return res.status(500).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};

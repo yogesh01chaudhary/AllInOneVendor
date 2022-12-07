@@ -32,6 +32,8 @@ const {
   addTimeSlot,
   requestLeave,
   requestEmergencyLeave,
+  logoutTime,
+  loginTime,
 } = require("../controllers/vendor");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -91,9 +93,13 @@ router.put("/updatePassword", auth, isVendor, updatePassword);
 
 //*************************************timeSlot*************************************************************************//
 router.put("/timeSlot", auth, isVendor, addTimeSlot);
+
+//*************************************leave/emergencyLeaveRequest*************************************************************************//
 router.put("/requestEmergencyLeave", auth, isVendor, requestEmergencyLeave);
 router.put("/requestLeave", auth, isVendor, requestLeave);
 
-
+//*************************************timeSlot*************************************************************************//
+router.put("/loginTime", auth, isVendor, loginTime);
+router.put("/logoutTime", auth, isVendor, logoutTime);
 
 module.exports = router;

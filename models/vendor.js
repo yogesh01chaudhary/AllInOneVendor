@@ -53,6 +53,16 @@ var BookingDutySchema = new Schema({
     type: String,
   },
 });
+
+var onDutySchema = new Schema(
+  {
+    loginTime: String,
+    logoutTime: String,
+    date: String,
+  },
+  { _id: false }
+);
+
 const VendorSchema = new Schema(
   {
     firstName: {
@@ -192,15 +202,8 @@ const VendorSchema = new Schema(
     onLeave: [LeaveSchema],
     emergencyLeave: [EmergencyLeaveSchema],
 
-    onDuty: [
-      {
-        loginTime: String,
-        logoutTime: String,
-        date: String,
-      },
-      { _id: false },
-    ],
-    onDutyStatus: { type: Boolean, enum: [true, false], defualt: false },
+    onDuty: [onDutySchema],
+    onDutyStatus: { type: Boolean, enum: [true, false], default: false },
     rating: [
       {
         userId: {
