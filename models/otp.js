@@ -1,14 +1,14 @@
 const { Schema, model } = require("mongoose");
 const OTPSchema = new Schema(
   {
-    bookingId: {
-      type: Schema.Types.ObjectId,
-      ref: "booking",
-      required: true,
-    },
-    otpDetails: {
-      type: String,
-    },
+    // bookingId: {
+    //   type: Schema.Types.ObjectId,
+    //   ref: "booking",
+    //   required: true,
+    // },
+    // otpDetails: {
+    //   type: String,
+    // },
     email: {
       type: String,
     },

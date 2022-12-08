@@ -6,6 +6,7 @@ const Booking = require("../models/booking");
 const Joi = require("joi");
 const mongoose = require("mongoose");
 const axios = require("axios");
+const fast2sms = require("fast-two-sms");
 
 // To add minutes to the current time
 function AddMinutesToDate(date, minutes) {
@@ -35,40 +36,131 @@ exports.sendOTPToMail = async (req, res) => {
     const expiredAt = AddMinutesToDate(now, 2);
 
     //Create OTP instance in DB
-    const otp_instance = await OTP.create({
-      otp,
-      expiredAt,
-    });
+    let otp_instance = await OTP.find({ email });
 
+    if (!otp_instance) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Something went wrong" });
+    }
+
+    if (otp_instance.length === 0) {
+      otp_instance = new OTP({
+        otp: otp,
+        expiredAt,
+        email,
+      });
+
+      otp_instance = await otp_instance.save();
+
+      if (!otp_instance) {
+        return res
+          .status(400)
+          .send({ sucess: false, message: "Something went wrong" });
+      }
+      if (type) {
+        if (type == "VERIFICATION") {
+          const {
+            message,
+            subject_mail,
+          } = require("../templates/email/email_verification");
+          email_message = message(otp);
+          email_subject = subject_mail;
+        } else if (type == "FORGET") {
+          const {
+            message,
+            subject_mail,
+          } = require("../templates/email/email_forget");
+          email_message = message(otp);
+          email_subject = subject_mail;
+        } else if (type == "2FA") {
+          const {
+            message,
+            subject_mail,
+          } = require("../templates/email/email_2FA");
+          email_message = message(otp);
+          email_subject = subject_mail;
+        } else {
+          const response = {
+            Status: "Failure",
+            Details: "Incorrect Type Provided",
+          };
+          return res.status(400).send(response);
+        }
+      }
+
+      let transporter = await nodemailer.createTransport({
+        service: process.env.SERVICE,
+        host: process.env.HOST,
+        port: process.env.PORTMAIL,
+        secure: false,
+        auth: {
+          user: process.env.USER,
+          pass: process.env.PASSWORD,
+        },
+      });
+
+      const mailResponse = await transporter.sendMail({
+        from: `"Yogesh Chaudhary" <${process.env.USER}>`,
+        to: `${email}`,
+        subject: email_subject,
+        text: email_message,
+      });
+
+      //Send Email
+      // const mailResponse = await transporter.sendMail(mailOptions);
+
+      if (!mailResponse) {
+        return res
+          .status(400)
+          .send({ success: true, message: "Something went wrong" });
+      }
+      if (mailResponse.accepted.length === 0) {
+        return res.status(400).send({ success: false, mailResponse });
+      }
+      return res
+        .status(200)
+        .send({ success: true, mailResponse, otp_instance });
+    }
     // Create details object containing the email and otp id
-    var details = {
-      timestamp: now,
-      check: email,
-      success: true,
-      message: "OTP sent to user",
-      otp_id: otp_instance.id,
-    };
+    // var details = {
+    //   timestamp: now,
+    //   check: email,
+    //   success: true,
+    //   message: "OTP sent to user",
+    //   otp_id: otp_instance.id,
+    // };
 
-    let bufferObj = Buffer.from(details.toString(), "utf8");
+    // let bufferObj = Buffer.from(details.toString(), "utf8");
 
-    // Encoding into base64
-    let base64String = bufferObj.toString("base64");
+    // // Encoding into base64
+    // let base64String = bufferObj.toString("base64");
 
-    // Printing the base64 encoded string
-    console.log("The encoded base64 string is:", base64String);
-    let bufferObj2 = Buffer.from(base64String, "base64");
+    // // Printing the base64 encoded string
+    // console.log("The encoded base64 string is:", base64String);
+    // let bufferObj2 = Buffer.from(base64String, "base64");
 
-    // Decoding base64 into String
-    let string = bufferObj2.toString("utf8");
+    // // Decoding base64 into String
+    // let string = bufferObj2.toString("utf8");
 
-    // Printing the base64 decoded string
-    console.log("The Decoded base64 string is:", string);
+    // // Printing the base64 decoded string
+    // console.log("The Decoded base64 string is:", string);
 
     // Encrypt the details object
     // const encoded = await encode(JSON.stringify(details));
     // console.log(details, encoded);
 
     //Choose message template according type requestedconst encoded= await encode(JSON.stringify(details))
+    otp_instance = otp_instance[0];
+    otp_instance = await OTP.findByIdAndUpdate(
+      otp_instance._id,
+      {
+        otp: otp,
+        expiredAt,
+        verified: false,
+      },
+      { new: true }
+    );
     if (type) {
       if (type == "VERIFICATION") {
         const {
@@ -129,7 +221,7 @@ exports.sendOTPToMail = async (req, res) => {
     if (mailResponse.accepted.length === 0) {
       return res.status(400).send({ success: false, mailResponse });
     }
-    return res.status(200).send({ success: true, details, mailResponse });
+    return res.status(200).send({ success: true, mailResponse, otp_instance });
   } catch (err) {
     const response = { Status: "Failure", Details: err.message };
     return res.status(400).send(response);
@@ -139,21 +231,21 @@ exports.sendOTPToMail = async (req, res) => {
 exports.verifyOTP = async (req, res) => {
   try {
     var currentdate = new Date();
-    const { verification_key, otp, check } = req.body;
+    const { verification_key, otp, email } = req.body;
 
-    if (!verification_key) {
-      const response = {
-        Status: "Failure",
-        Details: "Verification Key not provided",
-      };
-      return res.status(400).send(response);
-    }
+    // if (!verification_key) {
+    //   const response = {
+    //     Status: "Failure",
+    //     Details: "Verification Key not provided",
+    //   };
+    //   return res.status(400).send(response);
+    // }
     if (!otp) {
       const response = { Status: "Failure", Details: "OTP not Provided" };
       return res.status(400).send(response);
     }
-    if (!check) {
-      const response = { Status: "Failure", Details: "Check not Provided" };
+    if (!email) {
+      const response = { Status: "Failure", Details: "Email not Provided" };
       return res.status(400).send(response);
     }
 
@@ -168,20 +260,28 @@ exports.verifyOTP = async (req, res) => {
     // }
 
     // var obj = JSON.parse(decoded);
-    let obj = verification_key;
-    const check_obj = obj.check;
+    // let obj = verification_key;
+    // const check_obj = obj.check;
 
-    // Check if the OTP was meant for the same email or phone number for which it is being verified
-    if (check_obj != check) {
-      const response = {
-        Status: "Failure",
-        Details: "OTP was not sent to this particular email or phone number",
-      };
-      return res.status(400).send(response);
+    // // Check if the OTP was meant for the same email or phone number for which it is being verified
+    // if (check_obj != check) {
+    //   const response = {
+    //     Status: "Failure",
+    //     Details: "OTP was not sent to this particular email or phone number",
+    //   };
+    //   return res.status(400).send(response);
+    // }
+
+    let otp_instance = await OTP.find({ email });
+    if (!otp_instance) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Something went wrong" });
     }
-
-    let otp_instance = await OTP.findById(obj.otp_id);
-    console.log(otp_instance);
+    if (otp_instance.length === 0) {
+      return res.status(404).send({ success: false, message: "No Data Found" });
+    }
+    otp_instance = otp_instance[0];
 
     //Check if OTP is available in the DB
     if (otp_instance != null) {
@@ -197,7 +297,7 @@ exports.verifyOTP = async (req, res) => {
             const response = {
               Status: "Success",
               Details: "OTP Matched",
-              Check: check,
+              email,
             };
             return res.status(200).send(response);
           } else {
@@ -234,7 +334,7 @@ exports.phoneOTP = async (req, res) => {
     // }
 
     const { phone_number, type } = req.body;
-
+    console.log(req.body);
     let phone_message;
 
     if (!phone_number) {
@@ -244,6 +344,7 @@ exports.phoneOTP = async (req, res) => {
       };
       return res.status(400).send(response);
     }
+
     if (!type) {
       const response = { Status: "Failure", Details: "Type not provided" };
       return res.status(400).send(response);
@@ -255,26 +356,34 @@ exports.phoneOTP = async (req, res) => {
       upperCaseAlphabets: false,
       specialChars: false,
     });
+
+    console.log(otp);
+
     const now = new Date();
     const expiration_time = AddMinutesToDate(
       now,
-      process.env.OTP_EXPIRATION_TIME
+      1
+      // process.env.OTP_EXPIRATION_TIME
     );
 
     //Create OTP instance in DB
     let otp_instance = await OTP.find({ phone: phone_number });
+
     if (!otp_instance) {
       return res
         .status(400)
         .send({ success: false, message: "Something went wrong" });
     }
+
     if (otp_instance.length === 0) {
       otp_instance = new OTP({
         otp: otp,
         expiredAt: expiration_time,
         phone: phone_number,
       });
+
       otp_instance = await otp_instance.save();
+
       if (!otp_instance) {
         return res
           .status(400)
@@ -287,6 +396,7 @@ exports.phoneOTP = async (req, res) => {
       //     message: "OTP sent to user",
       //     otp_id: otp_instance.id,
       //   };
+
       if (type) {
         if (type == "VERIFICATION") {
           const message = require("../templates/sms/phone_verification");
@@ -305,14 +415,18 @@ exports.phoneOTP = async (req, res) => {
           return res.status(400).send(response);
         }
       }
-      var params = {
-        Message: phone_message,
-        PhoneNumber: phone_number,
+      var options = {
+        authorization:
+          "XyzuMWfakTDjJdA1evG3Zncb8xmIP5BiF2LU6OgloESsqpH7YwnB4dpYPb3Hm2gyzclwA8ifZEjL691U",
+        message: phone_message,
+        numbers: [`${phone_number}`],
       };
-      return res
-        .status(200)
-        .send({ success: true, params: params, instance: otp_instance });
+      console.log(options);
+      const response = await fast2sms.sendMessage(options);
+      console.log(response);
+      return res.status(200).send({ response, options });
     }
+
     otp_instance = otp_instance[0];
     otp_instance = await OTP.findByIdAndUpdate(
       otp_instance._id,
@@ -356,12 +470,23 @@ exports.phoneOTP = async (req, res) => {
       }
     }
 
+    console.log([`${phone_number}`]);
+    var options = {
+      authorization:
+        "XyzuMWfakTDjJdA1evG3Zncb8xmIP5BiF2LU6OgloESsqpH7YwnB4dpYPb3Hm2gyzclwA8ifZEjL691U",
+      message: phone_message,
+      numbers: [`${phone_number}`],
+    };
+    const response = await fast2sms.sendMessage(options);
+    console.log(response.message);
+    return res.status(200).send({ response, options });
+
     // Settings Params for SMS
     var params = {
       Message: phone_message,
       PhoneNumber: phone_number,
     };
-    return res.status(200).send({ params: params, instance: otp_instance });
+
     //Send the params to AWS SNS using aws-sdk
     var publishTextPromise = new AWS.SNS({ apiVersion: "2010-03-31" })
       .publish(params)
@@ -386,8 +511,7 @@ exports.phoneOTP = async (req, res) => {
 exports.verifyPhoneOTP = async (req, res) => {
   try {
     var currentdate = new Date();
-    console.log(req.body);
-    const { verification_key, otp, check } = req.body;
+    const { verification_key, otp, phone } = req.body;
 
     // if (!verification_key) {
     //   const response = {
@@ -400,8 +524,8 @@ exports.verifyPhoneOTP = async (req, res) => {
       const response = { Status: "Failure", Details: "OTP not Provided" };
       return res.status(400).send(response);
     }
-    if (!check) {
-      const response = { Status: "Failure", Details: "Check not Provided" };
+    if (!phone) {
+      const response = { Status: "Failure", Details: "Phone not Provided" };
       return res.status(400).send(response);
     }
 
@@ -428,7 +552,7 @@ exports.verifyPhoneOTP = async (req, res) => {
     //   return res.status(400).send(response);
     // }
 
-    let otp_instance = await OTP.find({ phone: check });
+    let otp_instance = await OTP.find({ phone });
     if (!otp_instance) {
       return res
         .status(400)
@@ -453,7 +577,7 @@ exports.verifyPhoneOTP = async (req, res) => {
             const response = {
               Status: "Success",
               Details: "OTP Matched",
-              Check: check,
+              phone,
             };
             return res.status(200).send(response);
           } else {
@@ -475,134 +599,5 @@ exports.verifyPhoneOTP = async (req, res) => {
   } catch (err) {
     const response = { Status: "Failure", Details: err.message };
     return res.status(400).send(response);
-  }
-};
-
-// **********************************2FA*********************************************************************************//
-exports.sendOTPDetails = async (req, res) => {
-  try {
-    const { body } = req;
-    const { error } = Joi.object()
-      .keys({ bookingId: Joi.string().required() })
-      .required()
-      .validate(body);
-    if (error) {
-      console.log(error);
-      return res
-        .status(400)
-        .send({ success: false, error: error.details[0].message });
-    }
-    let matchQuery = {
-      $match: {
-        $and: [{ _id: mongoose.Types.ObjectId(body.bookingId) }],
-      },
-    };
-
-    let data = await Booking.aggregate([
-      {
-        $facet: {
-          totalData: [
-            matchQuery,
-            {
-              $lookup: {
-                from: "services",
-                localField: "service",
-                foreignField: "_id",
-                as: "serviceData",
-              },
-            },
-
-            {
-              $lookup: {
-                from: "users",
-                localField: "userId",
-                foreignField: "_id",
-                as: "userData",
-              },
-            },
-          ],
-          totalCount: [matchQuery, { $count: "count" }],
-        },
-      },
-    ]);
-
-    let result = data[0].totalData;
-    let count = data[0].totalCount;
-
-    if (result.length === 0) {
-      return res.status(404).send({
-        success: false,
-        message: "No Result",
-      });
-    }
-    result = result[0];
-    console.log(result);
-
-    console.log(process.env.OTP_API + result.userData[0].phone + "/AUTOGEN");
-    axios
-      .get(process.env.OTP_API + result.userData[0].phone + "/AUTOGEN")
-      .then(async (response) => {
-        let otp_instance = new OTP({
-          bookingId: body.bookingId,
-          phone: result.userData[0].phone,
-          otpDetails: response.data.Details,
-        });
-        otp_instance = await otp_instance.save();
-        return res.status(200).json({
-          message: "OTP sent successfully",
-          details: response.data.Details,
-          otp_instance,
-        });
-      })
-      .catch((er) => {
-        return res.status(500).json({ message: "Error", error: er.message });
-      });
-  } catch (e) {
-    return res
-      .status(500)
-      .json({ message: "Something went wrong", error: e.message });
-  }
-};
-
-exports.verifyOTPDetails = async (req, res) => {
-  try {
-    const { body } = req;
-    console.log(body);
-    const { error } = Joi.object()
-      .keys({ otpId: Joi.string().required(), otp: Joi.number().required() })
-      .required()
-      .validate(body);
-    if (error) {
-      console.log(error);
-      return res
-        .status(400)
-        .send({ success: false, error: error.details[0].message });
-    }
-
-    let data = await OTP.findById({_id:body.otpId});
-    if (!data) {
-      return res
-        .status(404)
-        .send({ success: false, message: "Data Not Found" });
-    }
-    console.log(data);
-    console.log(
-      process.env.OTP_API + "VERIFY/" + data.otpDetails + "/" + body.otp
-    );
-    axios
-      .get(process.env.OTP_API + "VERIFY/" + data.details + "/" + body.otp)
-      .then(async (response) => {
-        if (response.data.Details === "OTP Matched") {
-          return es.staus(200).send({ success: true, message: "OTP Matched" });
-        } else if (response.data.Details === "OTP Expired") {
-          return res.status(403).json({ message: "OTP Expired" });
-        }
-        return res.status(500).json({ message: "Something went wrong 1" });
-      })
-      .catch((error) => {
-        return res.status(500).json(error);
-      });
-  } catch (e) {
-    return res.status(500).json({ message: "Something went wrong" });
   }
 };
