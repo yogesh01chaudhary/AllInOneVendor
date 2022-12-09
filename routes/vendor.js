@@ -34,6 +34,7 @@ const {
   requestEmergencyLeave,
   logoutTime,
   loginTime,
+  updateEmail,
 } = require("../controllers/vendor");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -45,6 +46,7 @@ router.post("/verifyOTP", verifyOTP);
 
 //*************************************updatingDetails********************************************************************************//
 router.put("/signUp", auth, isVendor, signUp);
+router.put("/email", auth, isVendor, updateEmail);
 router.put("/bankDetails", auth, isVendor, addBankAccountDetails);
 router.put("/coordinates", auth, isVendor, updateCoordinates);
 

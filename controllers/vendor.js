@@ -75,7 +75,6 @@ exports.verifyOTP = async (req, res) => {
         return res.status(410).send({ success: false, message: "OTP Expired" });
       }
 
-      console.log(result.data);
       if (result.data.Details === "OTP Mismatch") {
         return res
           .status(401)
@@ -95,8 +94,7 @@ exports.verifyOTP = async (req, res) => {
         let refreshToken = await createToken(vendor);
         return res.status(201).send({
           success: true,
-          message: "Vendor doesn't exist but data saved wth phone number",
-          vendor,
+          message: "Registered Successfully",
           token,
           refreshToken,
         });
@@ -111,7 +109,6 @@ exports.verifyOTP = async (req, res) => {
         success: true,
         message: "Welcome Back",
         token,
-        vendor,
         refreshToken,
       });
     } catch (e) {
@@ -138,9 +135,12 @@ exports.signUp = async (req, res) => {
         DOB: Joi.date().required(),
         workExperience: Joi.string(),
         gender: Joi.string().required(),
-        alternateNumber: Joi.number(),
-        emergencyNumber: Joi.number(),
-        email: Joi.string().email().required(),
+        alternateNumber: Joi.string()
+          .regex(/^[6-9]{1}[0-9]{9}$/)
+          .required(),
+        emergencyNumber: Joi.string()
+          .regex(/^[6-9]{1}[0-9]{9}$/)
+          .required(),
         currentAddress: Joi.object().keys({
           address: Joi.string().required(),
           city: Joi.string().required(),
@@ -155,6 +155,7 @@ exports.signUp = async (req, res) => {
         }),
         longitude: Joi.number(),
         latitude: Joi.number(),
+        deviceToken: Joi.string().required(),
       })
       .required()
       .validate(body);
@@ -163,13 +164,8 @@ exports.signUp = async (req, res) => {
         .status(400)
         .send({ success: false, message: error.details[0].message });
     }
-    const vendor = await Vendor.findByIdAndUpdate(id, body, { new: true });
-    if (!vendor) {
-      return res.status(404).send({
-        success: false,
-        message: "No Vendor Found",
-      });
-    }
+
+    let vendor = await Vendor.findByIdAndUpdate(id, body, { new: true });
 
     let address = `${vendor.currentAddress.city},${vendor.currentAddress.state},${vendor.currentAddress.pin}`;
 
@@ -177,26 +173,90 @@ exports.signUp = async (req, res) => {
 
     let longitude = req.body.longitude || loc[0].longitude;
     let latitude = req.body.latitude || loc[0].latitude;
+
     vendor.location = {
       type: "Point",
       coordinates: [longitude, latitude],
     };
+
     vendor
       .save()
       .then(async (vendor) => {
         return res.status(200).send({
           success: true,
-          message: "Vendor saved successfully",
-          vendor,
+          message: "Vendor Profile Updated successfully",
         });
       })
       .catch((e) => {
-        return res
-          .status(400)
-          .send({ success: false, message: "Vendor not saved", e: e.message });
+        return res.status(400).send({
+          success: false,
+          message: "SignedUp Failed",
+          error: e.message,
+        });
       });
   } catch (e) {
-    res.status(500).send({ success: false, message: e.message });
+    res.status(500).send({
+      success: false,
+      error: e.message,
+      message: "Something went wrong",
+    });
+  }
+};
+
+//@desc update the vendors details
+//@route GET/vendor/email
+//@access Private
+exports.updateEmail = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const { body } = req;
+    const { error, value } = Joi.object()
+      .keys({
+        email: Joi.string().lowercase().trim().email().required(),
+      })
+      .required()
+      .validate(body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    let vendor = await Vendor.find({ email: value.email });
+    if (!vendor) {
+      return res.status(500).send({
+        success: false,
+        message: "Something went wrong",
+      });
+    }
+    if (vendor[0]) {
+      return res.status(400).send({
+        success: false,
+        message: "Email must be unique",
+      });
+    }
+    vendor = await Vendor.findByIdAndUpdate(id, value, { new: true });
+
+    vendor
+      .save()
+      .then(async (vendor) => {
+        return res.status(200).send({
+          success: true,
+          message: "Email Updated Successfully",
+        });
+      })
+      .catch((e) => {
+        return res.status(400).send({
+          success: false,
+          message: "Email Not Updated",
+          error: e.message,
+        });
+      });
+  } catch (e) {
+    res.status(500).send({
+      success: false,
+      error: e.message,
+      message: "Something went wrong",
+    });
   }
 };
 
