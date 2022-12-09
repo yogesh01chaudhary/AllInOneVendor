@@ -304,11 +304,13 @@ exports.addBankAccountDetails = async (req, res) => {
 
     return res.status(200).send({
       success: true,
-      message: "Vendor saved successfully",
-      vendor,
+      message: "Bank Details saved successfully",
+      bankDetails: vendor.bankDetails,
     });
   } catch (e) {
-    res.status(500).send({ success: false, message: e.name });
+    res
+      .status(500)
+      .send({ success: false, error: e.name, message: "Something went wrong" });
   }
 };
 
@@ -344,7 +346,7 @@ exports.updateCoordinates = async (req, res) => {
     return res.status(200).send({
       success: true,
       message: "Vendor coordiantes updated successfully",
-      vendor,
+      location: vendor.location,
     });
   } catch (e) {
     res.status(500).send({ success: false, message: e.message });
@@ -383,7 +385,7 @@ exports.requestForService = async (req, res) => {
       success: true,
       message:
         "Requested For Service successfully,Your services will be activated withing 24 hrs",
-      vendor,
+      requestedService: vendor.requestedService,
     });
   } catch (e) {
     return res.status(400).send({
@@ -399,10 +401,10 @@ exports.requestForService = async (req, res) => {
 //@access Private
 exports.loginVendor2 = async (req, res) => {
   try {
-    let { vendorId, password } = req.body;
-    const { error } = Joi.object()
+    let { email, password } = req.body;
+    const { error, value } = Joi.object()
       .keys({
-        vendorId: Joi.string().required(),
+        email: Joi.string().trim().lowercase().email().required(),
         password: Joi.string().required(),
       })
       .required()
@@ -412,13 +414,13 @@ exports.loginVendor2 = async (req, res) => {
         .status(400)
         .send({ success: false, message: error.details[0].message });
     }
-    if (!(vendorId && password)) {
+    if (!(email && password)) {
       return res
         .status(400)
         .send({ success: false, message: "Please fill all the details" });
     }
 
-    let vendor = await Vendor.findOne({ email: vendorId });
+    let vendor = await Vendor.findOne({ email: value.email });
 
     if (!vendor) {
       return res.status(400).send({
@@ -426,10 +428,7 @@ exports.loginVendor2 = async (req, res) => {
         message: "Invalid credentials,Email Incorrect",
       });
     }
-    console.log("hi", vendor.password);
-    console.log("hii", password);
     const isPasswordMatched = await bcrypt.compare(password, vendor.password);
-    console.log(isPasswordMatched);
     if (!isPasswordMatched) {
       return res.status(400).send({
         success: false,
@@ -439,12 +438,12 @@ exports.loginVendor2 = async (req, res) => {
     let token = jwt.sign({ id: vendor._id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRY,
     });
-
+    let refreshToken = await createToken(vendor);
     return res.status(200).send({
       success: true,
       message: "Vendor logged in Successsfully!",
       token,
-      vendor,
+      refreshToken,
     });
   } catch (e) {
     return res.status(400).send({
@@ -504,7 +503,6 @@ exports.updatePassword = async (req, res) => {
     return res.status(200).send({
       success: true,
       message: "Password updated successfully",
-      vendor,
     });
   } catch (e) {
     return res.status(400).send({
@@ -517,6 +515,7 @@ exports.updatePassword = async (req, res) => {
 
 // *********************************************UPLOAD_IMAGE************************************************************************ //
 
+//EXTRA
 //@desc Upload profile photo express-fileupload
 //@route PUT/vendor/photo
 //@access Private
@@ -610,6 +609,7 @@ exports.uploadProfilePhoto = async (req, res) => {
   }
 };
 
+//EXTRA
 //@desc get Signed Url S3
 //@route GET/vendor/s3Url
 //@access Private
@@ -1520,7 +1520,7 @@ exports.addTimeSlot = async (req, res) => {
     return res.status(200).send({
       success: true,
       message: "Vendor saved successfully with timeSlot",
-      vendor,
+      timeSlot:vendor.timeSlot,
     });
   } catch (e) {
     res.status(500).send({ success: false, message: e.message });
@@ -1563,7 +1563,7 @@ exports.requestLeave = async (req, res) => {
     return res.status(200).send({
       success: true,
       message: "Vendor Requested For leave",
-      vendor,
+      onLeave:vendor.onLeave,
     });
   } catch (e) {
     res.status(500).send({ success: false, message: e.message });
@@ -1602,7 +1602,7 @@ exports.requestEmergencyLeave = async (req, res) => {
     return res.status(200).send({
       success: true,
       message: "Vendor Requested For leave",
-      vendor,
+      emergencyLeave:vendor.emergencyLeave,
     });
   } catch (e) {
     res.status(500).send({ success: false, message: e.message });
