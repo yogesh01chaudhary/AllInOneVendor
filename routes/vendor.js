@@ -35,6 +35,7 @@ const {
   logoutTime,
   loginTime,
   updateEmail,
+  getReviews,
 } = require("../controllers/vendor");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -103,5 +104,7 @@ router.put("/requestLeave", auth, isVendor, requestLeave);
 //*************************************timeSlot*************************************************************************//
 router.put("/loginTime", auth, isVendor, loginTime);
 router.put("/logoutTime", auth, isVendor, logoutTime);
+
+router.get("/reviews",auth, isVendor, getReviews)
 
 module.exports = router;

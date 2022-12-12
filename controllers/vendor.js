@@ -1520,7 +1520,7 @@ exports.addTimeSlot = async (req, res) => {
     return res.status(200).send({
       success: true,
       message: "Vendor saved successfully with timeSlot",
-      timeSlot:vendor.timeSlot,
+      timeSlot: vendor.timeSlot,
     });
   } catch (e) {
     res.status(500).send({ success: false, message: e.message });
@@ -1563,7 +1563,7 @@ exports.requestLeave = async (req, res) => {
     return res.status(200).send({
       success: true,
       message: "Vendor Requested For leave",
-      onLeave:vendor.onLeave,
+      onLeave: vendor.onLeave,
     });
   } catch (e) {
     res.status(500).send({ success: false, message: e.message });
@@ -1602,7 +1602,7 @@ exports.requestEmergencyLeave = async (req, res) => {
     return res.status(200).send({
       success: true,
       message: "Vendor Requested For leave",
-      emergencyLeave:vendor.emergencyLeave,
+      emergencyLeave: vendor.emergencyLeave,
     });
   } catch (e) {
     res.status(500).send({ success: false, message: e.message });
@@ -1791,5 +1791,32 @@ exports.logoutTime = async (req, res) => {
       message: "Something went wrong",
       error: e.message,
     });
+  }
+};
+
+exports.getReviews = async (req, res) => {
+  try {
+    const { user } = req;
+    let vendor = await Vendor.findById(user.id, {
+      "reviews.rating": 1,
+      "reviews.name": 1,
+      "reviews.comment": 1,
+      "reviews.user": 1,
+      rating: 1,
+      reviewNumber: 1,
+    });
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    return res.status(200).send({
+      success: true,
+      reviews: vendor.reviews,
+      rating: vendor.rating,
+      totalReviews: vendor.reviewNumber,
+    });
+  } catch (e) {
+    return res.status(500).send({ success: false, message: e.message });
   }
 };
