@@ -36,6 +36,9 @@ const {
   loginTime,
   updateEmail,
   getReviews,
+  base64ImageUpload,
+  addMultipleImageToS3,
+  deleteFormDataImage,
 } = require("../controllers/vendor");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -106,5 +109,9 @@ router.put("/loginTime", auth, isVendor, loginTime);
 router.put("/logoutTime", auth, isVendor, logoutTime);
 
 router.get("/reviews",auth, isVendor, getReviews)
+
+router.put("/base64ImageUpload",auth, isVendor, base64ImageUpload)
+router.put("/addMultipleImageToS3",auth, isVendor, addMultipleImageToS3)
+router.delete("/deleteFormDataImage",auth, isVendor, deleteFormDataImage)
 
 module.exports = router;

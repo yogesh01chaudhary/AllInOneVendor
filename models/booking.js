@@ -72,5 +72,13 @@ const BookingSchema = new Schema({
     enum: ["Failed", "Successful", "Pending"],
     default: "Pending",
   },
+  bookingVerificationImage: {
+    maskSelfie: {
+      type: String,
+    },
+    productImage: {
+      type: String,
+    },
+  },
 });
 module.exports = model("booking", BookingSchema);

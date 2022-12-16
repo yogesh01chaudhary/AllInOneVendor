@@ -12,6 +12,7 @@ const {
   deleteProductUrl,
   transferCount,
   bookingStartTime,
+  bookingImageUpload,
 } = require("../controllers/booking");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -37,5 +38,7 @@ router.delete("/productUrl", auth, isVendor, deleteProductUrl);
 //testing
 router.put("/transferCount", auth, isVendor, transferCount);
 router.put("/bookingStartTime", auth, isVendor, bookingStartTime);
+
+router.put("/bookingImageUpload", auth, isVendor, bookingImageUpload);
 
 module.exports = router;

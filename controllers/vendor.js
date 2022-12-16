@@ -1820,3 +1820,296 @@ exports.getReviews = async (req, res) => {
     return res.status(500).send({ success: false, message: e.message });
   }
 };
+
+exports.base64ImageUpload = async (req, res) => {
+  try {
+    const { error } = Joi.object()
+      .keys({
+        image: Joi.string(),
+        uploadFor: Joi.string().required(),
+      })
+      .required()
+      .validate(req.body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    const { id } = req.user;
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+
+    var image;
+    if (!req.files && !req.body.image) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Please upload the file" });
+    }
+
+    if (req.files) {
+      if (req.files.image.length > 1) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Can Upload Only 1 image" });
+      }
+      if (!req.files.image.mimetype.startsWith("image")) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Please provide valid image" });
+      }
+      image = req.files.image.data;
+    }
+
+    if (req.body.image) {
+      image = Buffer.from(
+        req.body.image.replace(/^data:image\/\w+;base64,/, ""),
+        "base64"
+      );
+    }
+
+    const uploadToS3 = async (uploadType, vendor) => {
+      let check = uploadType.split(".");
+      let found;
+      if (check.length == 1) {
+        found = vendor[`${check[0]}`];
+      }
+      if (check.length == 2) {
+        found = vendor[`${check[0]}`][`${check[1]}`];
+      }
+      if (found) {
+        let key = found.split("/");
+        key = key[key.length - 2] + "/" + key[key.length - 1];
+        const params = {
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: key,
+          Body: image,
+          ContentEncoding: "base64",
+          ContentType: `image/jpeg`,
+        };
+        s3.upload(params, async (error, data) => {
+          if (error) {
+            return res.status(500).send(error.message);
+          } else {
+            const vendor = await Vendor.findByIdAndUpdate(
+              req.user.id,
+              {
+                [`${uploadType}`]: data.Location,
+              },
+              { new: true }
+            );
+            if (vendor) {
+              return res.status(200).send({
+                status: true,
+                message: `Image Updated Successfully For  ${uploadType}`,
+              });
+            } else {
+              return res.status(400).send({
+                status: false,
+                message: "Image Not Updated",
+              });
+            }
+          }
+        });
+      } else {
+        const params = {
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: `${id}/${uuidv4()}.jpeg`,
+          Body: image,
+          ContentEncoding: "base64",
+          ContentType: `image/jpeg`,
+        };
+        s3.upload(params, async (error, data) => {
+          if (error) {
+            return res.status(500).send(error.message);
+          } else {
+            const vendor = await Vendor.findByIdAndUpdate(
+              req.user.id,
+              {
+                [`${uploadType}`]: data.Location,
+              },
+              { new: true }
+            );
+            if (vendor) {
+              return res.status(200).send({
+                status: true,
+                message: `Image Uploaded Successfully For ${uploadType}`,
+              });
+            } else {
+              return res.status(400).send({
+                status: false,
+                message: "Image Not uploaded",
+              });
+            }
+          }
+        });
+      }
+    };
+
+    let vendor = await Vendor.findById({ _id: id });
+
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+
+    if (req.body.uploadFor === "imageUrl") {
+      uploadToS3(req.body.uploadFor, vendor);
+    } else if (req.body.uploadFor === "verification.aadharFront") {
+      uploadToS3(req.body.uploadFor, vendor);
+    } else if (req.body.uploadFor === "verification.aadharBack") {
+      uploadToS3(req.body.uploadFor, vendor);
+    } else if (req.body.uploadFor === "verification.selfie1") {
+      uploadToS3(req.body.uploadFor, vendor);
+    } else if (req.body.uploadFor === "verification.selfie2") {
+      uploadToS3(req.body.uploadFor, vendor);
+    } else if (req.body.uploadFor === "verification.pancard") {
+      uploadToS3(req.body.uploadFor, vendor);
+    } else {
+      return res
+        .status(400)
+        .send({ success: false, message: "Please provide valid uploadFor" });
+    }
+  } catch (error) {
+    return res.status(500).send({
+      status: false,
+      message: error.toString(),
+    });
+  }
+};
+
+exports.deleteFormDataImage = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+
+    let fileName = req.body.imageUrl.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    const key = `${fileName}`;
+    var params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
+    let vendor = await Vendor.findById(id);
+
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+
+    if (vendor.imageUrl !== req.body.imageUrl) {
+      return res.status(400).send({
+        success: false,
+        message:
+          "Can't be deleted imageUrl doesn't match with Vendor's imageUrl",
+      });
+    }
+
+    s3.deleteObject(params, async (err) => {
+      if (err)
+        return res.status(500).send({
+          success: false,
+          message: "Something went wrong",
+          error: err.message,
+        });
+      let vendor = await Vendor.findByIdAndUpdate(
+        id,
+        { imageUrl: "" },
+        { new: true }
+      );
+      return res.status(200).send({
+        success: true,
+        message: "Successfully Deleted",
+        imageUrl: vendor.imageUrl,
+      });
+    });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+exports.addMultipleImageToS3 = async (req, res, next) => {
+  try {
+    console.log(req.files.image);
+    const { id } = req.user;
+    let promises = [];
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+    if (!req.files) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Please upload the file" });
+    }
+    // if (req.files.image.length > 1) {
+    //   return res
+    //     .status(400)
+    //     .send({ success: false, message: "Can Upload Only 1 image" });
+    // }
+    if (!req.files.image.mimetype.startsWith("image")) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Please provide valid image" });
+    }
+    const upload = async (data) => {
+      // var buf = Buffer.from(
+      //   item.icon.replace(/^data:image\/\w+;base64,/, ""),
+      //   "base64"
+      // );
+      const params = {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: `${id}/${uuidv4()}.png`,
+        Body: data,
+        ContentEncoding: "base64",
+        ContentType: `image/png`,
+      };
+
+      return new Promise((resolve, reject) => {
+        s3.upload(params, async (error, data) => {
+          if (error) {
+            reject(error.message);
+          } else {
+            resolve({
+              src: data.Location,
+            });
+          }
+        });
+      });
+    };
+    req.files.image.forEach(async (item) => {
+      promises.push(upload(item.data));
+    });
+
+    console.log("promises", promises);
+
+    Promise.all(promises)
+      .then(async (resp) => {
+        console.log("resp", resp);
+        // resp.forEach((icon) => {
+        //   req.files.images.forEach((item) => {
+        //     item["icon"] = icon.src;
+        //   });
+        // });
+        // const vendor = await Vendor.findByIdAndUpdate(
+        //   req.user.id,
+        //   { $set: { imageurl: req.files.images } },
+        //   { new: true }
+        // );
+      })
+      .catch((err) => {
+        return res.status(500).json(err);
+      });
+
+    res.status(200).json("Multiple Images Uploaded Successfully");
+  } catch (error) {
+    return res.status(500).json({
+      status: 0,
+      message: error.toString(),
+    });
+  }
+};

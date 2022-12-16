@@ -4,6 +4,8 @@ const Booking = require("../models/booking");
 const nodemailer = require("nodemailer");
 const mongoose = require("mongoose");
 const TransferCount = require("../models/transferCount");
+const { v4: uuidv4 } = require("uuid");
+const AWS = require("aws-sdk");
 
 //@desc admin send booking to nearbyvendors and vendor will confirm the booking
 //@route PUT vendor/booking/confirmBooking
@@ -344,29 +346,29 @@ exports.completeBooking = async (req, res) => {
       { new: true, session }
     );
     let vendor = await Vendor.findOneAndUpdate(
-        {
-          _id: mongoose.Types.ObjectId(user.id),
-          // bookings: { $all: [{ $elemMatch: { bookingId: body.bookingId } }] },
+      {
+        _id: mongoose.Types.ObjectId(user.id),
+        // bookings: { $all: [{ $elemMatch: { bookingId: body.bookingId } }] },
+      },
+      {
+        $set: {
+          // "bookings.$[elem].startTime": Date.now() + 60 * 60 * 24 * 1000,
+          "bookings.$[elem].endTime": Date.now(),
         },
-        {
-          $set: {
-            // "bookings.$[elem].startTime": Date.now() + 60 * 60 * 24 * 1000,
-              "bookings.$[elem].endTime": Date.now(),
-          },
-        },
-        {
-          arrayFilters: [
-            { "elem.bookingId": mongoose.Types.ObjectId(body.bookingId) },
-          ],
-          new: true,session
-        }
-      );
-      if (!vendor) {
-        return res
-          .status(404)
-          .send({ success: false, message: "Something went wrong" });
+      },
+      {
+        arrayFilters: [
+          { "elem.bookingId": mongoose.Types.ObjectId(body.bookingId) },
+        ],
+        new: true,
+        session,
       }
-      
+    );
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Something went wrong" });
+    }
 
     // send mail or sms to user to let him know that his booking is confirmed
     let transporter = await nodemailer.createTransport({
@@ -990,5 +992,154 @@ exports.bookingStartTime = async (req, res) => {
       message: "Something went wrong",
       error: e.message,
     });
+  }
+};
+
+exports.bookingImageUpload = async (req, res) => {
+  try {
+    // var buf = Buffer.from(
+    //   req.body.image.replace(/^data:image\/\w+;base64,/, ""),
+    //   "base64"
+    // );
+    // const { id } = req.user;
+    console.log(req.files);
+    const { bookingId, type } = req.body;
+    console.log(req.body);
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+    if (!req.files) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Please upload the file" });
+    }
+    if (req.files.image.length > 1) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Can Upload Only 1 image" });
+    }
+    if (!req.files.image.mimetype.startsWith("image")) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Please provide valid image" });
+    }
+    const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: `${bookingId}/${uuidv4()}.jpeg`,
+      Body: req.files.image.data,
+      ContentEncoding: "base64",
+      ContentType: `image/jpeg`,
+    };
+    s3.upload(params, async (error, data) => {
+      if (error) {
+        return res.status(500).send(error.message);
+      } else {
+        let dbUrl = `bookingVerificationImage.${type}`;
+        console.log(dbUrl);
+        if (type === "maskSelfie") {
+          const booking = await Booking.findByIdAndUpdate(
+            bookingId,
+            {
+              "bookingVerificationImage.maskSelfie": data.Location,
+            },
+            { new: true }
+          );
+          console.log(booking);
+          if (booking) {
+            return res.status(200).json({
+              status: true,
+              message: `${type} Uploaded successfully`,
+              url: booking.dbUrl,
+            });
+          } else {
+            return res.status(400).json({
+              status: false,
+              message: `${type} Not uploaded`,
+            });
+          }
+        }
+        if (type === "productImage") {
+          // let dbUrl = `bookingVerification.${type}`;
+          // console.log(dbUrl);
+          const booking = await Booking.findByIdAndUpdate(bookingId, {
+            "bookingVerificationImage.productImage": data.Location,
+          });
+          if (booking) {
+            return res.status(200).json({
+              status: true,
+              message: `${type} Uploaded successfully`,
+              url: booking.dbUrl,
+            });
+          } else {
+            return res.status(400).json({
+              status: false,
+              message: `${type} Not uploaded`,
+            });
+          }
+        }
+        return res.status(400).send({
+          success: false,
+          message: "Please provide the suitable type",
+        });
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: error.toString(),
+    });
+  }
+};
+
+exports.deleteFormDataImage = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+
+    let fileName = req.body.imageUrl.split("/");
+    fileName =
+      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
+    const key = `${fileName}`;
+    var params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
+    let booking = await booking.findById(id);
+
+    if (!booking) {
+      return res
+        .status(404)
+        .send({ success: false, message: "booking Doesn't Exists" });
+    }
+
+    if (booking.imageUrl !== req.body.imageUrl) {
+      return res.status(400).send({
+        success: false,
+        message:
+          "Can't be deleted imageUrl doesn't match with booking's imageUrl",
+      });
+    }
+
+    s3.deleteObject(params, async (err) => {
+      if (err)
+        return res.status(500).send({
+          success: false,
+          message: "Something went wrong",
+          error: err.message,
+        });
+      let booking = await booking.findByIdAndUpdate(
+        id,
+        { imageUrl: "" },
+        { new: true }
+      );
+      return res.status(200).send({
+        success: true,
+        message: "Successfully Deleted",
+        imageUrl: booking.imageUrl,
+      });
+    });
+  } catch (e) {
+    res.status(500).send({ success: false, message: e.message });
   }
 };
