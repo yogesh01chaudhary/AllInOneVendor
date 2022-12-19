@@ -1988,45 +1988,71 @@ exports.deleteFormDataImage = async (req, res) => {
       secretAccessKey: process.env.AWS_SECRET,
     });
 
-    let fileName = req.body.imageUrl.split("/");
+    let fileName = req.body.url.split("/");
     fileName =
       fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
     const key = `${fileName}`;
     var params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
-    let vendor = await Vendor.findById(id);
 
+    const deleteFromS3 = async (type, vendor) => {
+      let check = type.split(".");
+      let found;
+      if (check.length == 1) {
+        found = vendor[`${check[0]}`];
+      }
+      if (check.length == 2) {
+        found = vendor[`${check[0]}`][`${check[1]}`];
+      }
+      if (found !== req.body.url) {
+        return res.status(400).send({
+          success: false,
+          message:
+            "Can't be deleted imageUrl doesn't match with Vendor's imageUrl",
+        });
+      }
+
+      s3.deleteObject(params, async (err) => {
+        if (err)
+          return res.status(500).send({
+            success: false,
+            message: "Something went wrong",
+            error: err.message,
+          });
+        let vendor = await Vendor.findByIdAndUpdate(
+          id,
+          { [`${type}`]: "" },
+          { new: true }
+        );
+        return res.status(200).send({
+          success: true,
+          message: "Successfully Deleted",
+        });
+      });
+    };
+    let vendor = await Vendor.findById(id);
     if (!vendor) {
       return res
         .status(404)
         .send({ success: false, message: "Vendor Doesn't Exists" });
     }
-
-    if (vendor.imageUrl !== req.body.imageUrl) {
+    if (req.body.type === "imageUrl") {
+      deleteFromS3(req.body.type, vendor);
+    } else if (req.body.type === "verification.aadharFront") {
+      deleteFromS3(req.body.type, vendor);
+    } else if (req.body.type === "verification.aadharBack") {
+      deleteFromS3(req.body.type, vendor);
+    } else if (req.body.type === "verification.selfie1") {
+      deleteFromS3(req.body.type, vendor);
+    } else if (req.body.type === "verification.selfie2") {
+      deleteFromS3(req.body.type, vendor);
+    } else if (req.body.type === "verification.pancard") {
+      deleteFromS3(req.body.type, vendor);
+    } else {
       return res.status(400).send({
         success: false,
-        message:
-          "Can't be deleted imageUrl doesn't match with Vendor's imageUrl",
+        message: "Please provide valid type to delete image",
       });
     }
-
-    s3.deleteObject(params, async (err) => {
-      if (err)
-        return res.status(500).send({
-          success: false,
-          message: "Something went wrong",
-          error: err.message,
-        });
-      let vendor = await Vendor.findByIdAndUpdate(
-        id,
-        { imageUrl: "" },
-        { new: true }
-      );
-      return res.status(200).send({
-        success: true,
-        message: "Successfully Deleted",
-        imageUrl: vendor.imageUrl,
-      });
-    });
   } catch (e) {
     res.status(500).send({ success: false, message: e.message });
   }
