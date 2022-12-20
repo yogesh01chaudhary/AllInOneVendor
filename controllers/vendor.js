@@ -1903,6 +1903,8 @@ exports.base64ImageUpload = async (req, res) => {
               return res.status(200).send({
                 status: true,
                 message: `Image Updated Successfully For  ${uploadType}`,
+                imageUrl: vendor.imageUrl,
+                verification: vendor.verification,
               });
             } else {
               return res.status(400).send({
@@ -1935,6 +1937,8 @@ exports.base64ImageUpload = async (req, res) => {
               return res.status(200).send({
                 status: true,
                 message: `Image Uploaded Successfully For ${uploadType}`,
+                imageUrl: vendor.imageUrl,
+                verification: vendor.verification,
               });
             } else {
               return res.status(400).send({
