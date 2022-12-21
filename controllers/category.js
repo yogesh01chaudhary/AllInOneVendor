@@ -7,15 +7,16 @@ exports.getAllCategory = async (req, res) => {
   try {
     let category = await Category.find(
       {},
-      { _id: 1, name: 1, subCategory: 1, service: 1 }
-    ).populate({
-      path: "subCategory",
-      select: { _id: 1, name: 1, service: 1 },
-      populate: {
-        path: "subCategory2",
-        select: { _id: 1, name: 1, service: 1 },
-      },
-    });
+      { _id: 1, name: 1, imageUrl:1 }
+    );
+    // .populate({
+    //   path: "subCategory",
+    //   select: { _id: 1, name: 1, service: 1 },
+    //   populate: {
+    //     path: "subCategory2",
+    //     select: { _id: 1, name: 1, service: 1 },
+    //   },
+    // });
 
     if (!category) {
       return res

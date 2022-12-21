@@ -221,7 +221,9 @@ exports.transferBooking = async (req, res) => {
       return res.status(200).send({
         success: true,
         message: "Transfer",
-        vendor,
+        transferCount: vendor.transferCount,
+        transferredBookings: vendor.transferredBookings,
+        count: transferCount.count,
       });
     }
     let transferCount = await TransferCount.findById(vendor.transferCount);
@@ -245,28 +247,42 @@ exports.transferBooking = async (req, res) => {
       return res.status(200).send({
         success: true,
         message: "Transfer",
-        vendor,
+        transferCount: vendor.transferCount,
+        transferredBookings: vendor.transferredBookings,
+        count: transferCount.count,
       });
     }
     if (transferCount.count !== 3) {
-      vendor = await TransferCount.findByIdAndUpdate(
+      transferCount = await TransferCount.findByIdAndUpdate(
         vendor.transferCount,
         {
           count: transferCount.count + 1,
+          $addToSet: { transferredBookings: body.bookingId },
+        },
+        { new: true }
+      );
+      vendor = await Vendor.findByIdAndUpdate(
+        user.id,
+        {
+          $addToSet: { transferredBookings: body.bookingId },
         },
         { new: true }
       );
       return res.status(200).send({
         success: true,
         message: "Transfer",
-        vendor,
+        transferCount: vendor.transferCount,
+        transferredBookings: vendor.transferredBookings,
+        count: transferCount.count,
       });
     }
     return res.status(200).send({
       success: true,
       message:
         "Your Account Is Blocked You Have Reached Maximum Transfer Limit",
-      vendor,
+      transferCount: vendor.transferCount,
+      transferredBookings: vendor.transferredBookings,
+      count: transferCount.count,
     });
   } catch (e) {
     return res.status(400).send({
@@ -488,288 +504,6 @@ exports.getBookingsVendor = async (req, res) => {
       message: "Something went wrong",
       error: e.message,
     });
-  }
-};
-
-// ******************************************SELFIE_WITH_MASK******************************************************************************//
-//@desc get s3Url fro newOne and for update image check in DB imageUrl
-//@route GET/vendor/s3Url1
-//@access Private
-exports.s3UrlMaskSelfie = async (req, res) => {
-  try {
-    const s3 = new AWS.S3({
-      accessKeyId: process.env.AWS_ID,
-      secretAccessKey: process.env.AWS_SECRET,
-    });
-    const { id } = req.user;
-    let vendor = await Vendor.findById(id);
-    if (!vendor) {
-      return res
-        .status(404)
-        .send({ success: false, message: "Vendor Doesn't Exists" });
-    }
-    if (!vendor.imageUrl) {
-      const key = `${id}/${uuidv4()}.jpeg`;
-      const url = await s3.getSignedUrlPromise("putObject", {
-        Bucket: process.env.AWS_BUCKET_NAME,
-        ContentType: "image/jpeg",
-        Key: key,
-        Expires: 120,
-      });
-      return res.status(200).send({
-        success: true,
-        message: "Url generated , imageUrl doesn't exists in DB",
-        url,
-        key,
-      });
-    }
-
-    let fileName = vendor.imageUrl.split("/");
-    fileName =
-      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
-    console.log("filename", fileName);
-    const key = `${fileName}`;
-    const url = await s3.getSignedUrlPromise("putObject", {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      ContentType: "image/jpeg",
-      Key: key,
-      Expires: 60,
-    });
-    return res
-      .status(200)
-      .send({ success: true, message: "Url generated", url, key });
-  } catch (e) {
-    res.status(500).send({ success: false, message: e.message });
-  }
-};
-
-//@desc Upload imageUrl in DB using  S3
-//@route PUT/vendor/imageUrl
-//@access Private
-exports.updateMaskSelfie = async (req, res) => {
-  try {
-    const { user, body } = req;
-    Joi.object()
-      .keys({
-        body: Joi.object().keys({
-          imageUrl: Joi.string().required(),
-        }),
-        user: Joi.object().keys({
-          id: Joi.string().required(),
-        }),
-      })
-      .required()
-      .validate(req);
-    let vendor = await Vendor.findByIdAndUpdate(
-      user.id,
-      { imageUrl: body.imageUrl },
-      { new: true }
-    );
-    if (!vendor) {
-      return res
-        .status(404)
-        .send({ success: false, message: "Vendor Doesn't Exists" });
-    }
-    return res
-      .status(200)
-      .send({ success: true, message: "Image Url Updated", vendor });
-  } catch (e) {
-    res.status(500).send({ success: false, message: e.message });
-  }
-};
-
-//@desc delete image from s3 Bucket and DB
-//@route DELETE vendor/imageUrl
-//@access Private
-exports.deleteMaskSelfie = async (req, res) => {
-  try {
-    const { id } = req.user;
-
-    const s3 = new AWS.S3({
-      accessKeyId: process.env.AWS_ID,
-      secretAccessKey: process.env.AWS_SECRET,
-    });
-
-    let fileName = req.body.imageUrl.split("/");
-    fileName =
-      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
-    const key = `${fileName}`;
-    var params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
-    let vendor = await Vendor.findById(id);
-
-    if (!vendor) {
-      return res
-        .status(404)
-        .send({ success: false, message: "Vendor Doesn't Exists" });
-    }
-
-    if (vendor.imageUrl !== req.body.imageUrl) {
-      return res.status(400).send({
-        success: false,
-        message:
-          "Can't be deleted imageUrl doesn't match with Vendor's imageUrl",
-      });
-    }
-
-    s3.deleteObject(params, async (err) => {
-      if (err)
-        return res.status(500).send({
-          success: false,
-          message: "Something went wrong",
-          error: err.message,
-        });
-      let vendor = await Vendor.findByIdAndUpdate(
-        id,
-        { imageUrl: "" },
-        { new: true }
-      );
-      return res
-        .status(200)
-        .send({ success: true, message: "Successfully Deleted", vendor });
-    });
-  } catch (e) {
-    res.status(500).send({ success: false, message: e.message });
-  }
-};
-
-// ******************************************PRODUCTS_IMAGE_UPLOAD******************************************************************************//
-//@desc get s3Url fro newOne and for update image check in DB imageUrl
-//@route GET/vendor/s3Url1
-//@access Private
-exports.s3UrlProduct = async (req, res) => {
-  try {
-    const s3 = new AWS.S3({
-      accessKeyId: process.env.AWS_ID,
-      secretAccessKey: process.env.AWS_SECRET,
-    });
-    const { id } = req.user;
-    let vendor = await Vendor.findById(id);
-    if (!vendor) {
-      return res
-        .status(404)
-        .send({ success: false, message: "Vendor Doesn't Exists" });
-    }
-    if (!vendor.imageUrl) {
-      const key = `${id}/${uuidv4()}.jpeg`;
-      const url = await s3.getSignedUrlPromise("putObject", {
-        Bucket: process.env.AWS_BUCKET_NAME,
-        ContentType: "image/jpeg",
-        Key: key,
-        Expires: 120,
-      });
-      return res.status(200).send({
-        success: true,
-        message: "Url generated , imageUrl doesn't exists in DB",
-        url,
-        key,
-      });
-    }
-
-    let fileName = vendor.imageUrl.split("/");
-    fileName =
-      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
-    console.log("filename", fileName);
-    const key = `${fileName}`;
-    const url = await s3.getSignedUrlPromise("putObject", {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      ContentType: "image/jpeg",
-      Key: key,
-      Expires: 60,
-    });
-    return res
-      .status(200)
-      .send({ success: true, message: "Url generated", url, key });
-  } catch (e) {
-    res.status(500).send({ success: false, message: e.message });
-  }
-};
-
-//@desc Upload imageUrl in DB using  S3
-//@route PUT/vendor/imageUrl
-//@access Private
-exports.updateProductUrl = async (req, res) => {
-  try {
-    const { user, body } = req;
-    Joi.object()
-      .keys({
-        body: Joi.object().keys({
-          imageUrl: Joi.string().required(),
-        }),
-        user: Joi.object().keys({
-          id: Joi.string().required(),
-        }),
-      })
-      .required()
-      .validate(req);
-    let vendor = await Vendor.findByIdAndUpdate(
-      user.id,
-      { imageUrl: body.imageUrl },
-      { new: true }
-    );
-    if (!vendor) {
-      return res
-        .status(404)
-        .send({ success: false, message: "Vendor Doesn't Exists" });
-    }
-    return res
-      .status(200)
-      .send({ success: true, message: "Image Url Updated", vendor });
-  } catch (e) {
-    res.status(500).send({ success: false, message: e.message });
-  }
-};
-
-//@desc delete image from s3 Bucket and DB
-//@route DELETE vendor/imageUrl
-//@access Private
-exports.deleteProductUrl = async (req, res) => {
-  try {
-    const { id } = req.user;
-
-    const s3 = new AWS.S3({
-      accessKeyId: process.env.AWS_ID,
-      secretAccessKey: process.env.AWS_SECRET,
-    });
-
-    let fileName = req.body.imageUrl.split("/");
-    fileName =
-      fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
-    const key = `${fileName}`;
-    var params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
-    let vendor = await Vendor.findById(id);
-
-    if (!vendor) {
-      return res
-        .status(404)
-        .send({ success: false, message: "Vendor Doesn't Exists" });
-    }
-
-    if (vendor.imageUrl !== req.body.imageUrl) {
-      return res.status(400).send({
-        success: false,
-        message:
-          "Can't be deleted imageUrl doesn't match with Vendor's imageUrl",
-      });
-    }
-
-    s3.deleteObject(params, async (err) => {
-      if (err)
-        return res.status(500).send({
-          success: false,
-          message: "Something went wrong",
-          error: err.message,
-        });
-      let vendor = await Vendor.findByIdAndUpdate(
-        id,
-        { imageUrl: "" },
-        { new: true }
-      );
-      return res
-        .status(200)
-        .send({ success: true, message: "Successfully Deleted", vendor });
-    });
-  } catch (e) {
-    res.status(500).send({ success: false, message: e.message });
   }
 };
 
