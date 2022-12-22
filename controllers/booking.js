@@ -17,7 +17,7 @@ exports.confirmBooking = async (req, res) => {
     const { body, user } = req;
     const { error } = Joi.object()
       .keys({
-        bookingId: Joi.string().required(),
+        booking: Joi.string().required(),
       })
       .required()
       .validate(body);
@@ -29,7 +29,7 @@ exports.confirmBooking = async (req, res) => {
     let matchQuery = {
       $match: {
         $and: [
-          { _id: mongoose.Types.ObjectId(body.bookingId) },
+          { _id: mongoose.Types.ObjectId(body.booking) },
           { bookingStatus: "Pending" },
         ],
       },
@@ -66,12 +66,12 @@ exports.confirmBooking = async (req, res) => {
     }
 
     let booking = await Booking.findByIdAndUpdate(
-      body.bookingId,
+      body.booking,
       {
         bookingStatus: "Confirmed",
         vendor: user.id,
       },
-      { upsert: true, new: true, session }
+      { new: true, session }
     );
     if (!booking) {
       return res
@@ -80,8 +80,20 @@ exports.confirmBooking = async (req, res) => {
     }
     let vendor = await Vendor.findByIdAndUpdate(
       user.id,
-      { $addToSet: { bookings: new mongoose.Types.ObjectId(body.bookingId) } },
-      { upsert: true, new: true, session }
+      {
+        $addToSet: {
+          bookings: { bookingId: new mongoose.Types.ObjectId(body.booking) },
+        },
+        $addToSet: {
+          timeSlot: {
+            start: result.timeSlot.start,
+            end: result.timeSlot.end,
+            bookingDate: result.timeSlot.bookingDate,
+            booked: true,
+          },
+        },
+      },
+      { new: true, session }
     );
     if (!vendor) {
       return res
@@ -104,10 +116,10 @@ exports.confirmBooking = async (req, res) => {
     const mailResponse = await transporter.sendMail({
       from: `"Yogesh Chaudhary" <${process.env.USER}>`,
       to: `${result.userData[0].email}`,
-      subject: `OrderID ${body.bookingId} Status`,
+      subject: `OrderID ${body.booking} Status`,
       text:
         `Dear User, \n\n` +
-        `Your booking having booking id ${body.bookingId} is confirmed. \n\n` +
+        `Your booking having booking id ${body.booking} is confirmed. \n\n` +
         "This is a auto-generated email. Please do not reply to this email.\n\n" +
         "Regards\n" +
         "Yogesh Chaudhary\n\n",
@@ -149,7 +161,7 @@ exports.transferBooking = async (req, res) => {
     const { body, user } = req;
     const { error } = Joi.object()
       .keys({
-        bookingId: Joi.string().required(),
+        booking: Joi.string().required(),
       })
       .required()
       .validate(body);

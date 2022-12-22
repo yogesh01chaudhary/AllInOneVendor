@@ -45,17 +45,20 @@ var EmergencyLeaveSchema = new Schema(
 );
 
 //BookingDutySchema
-var BookingDutySchema = new Schema({
-  bookingId: {
-    type: Schema.Types.ObjectId,
+var BookingDutySchema = new Schema(
+  {
+    bookingId: {
+      type: Schema.Types.ObjectId,
+    },
+    startTime: {
+      type: String,
+    },
+    endTime: {
+      type: String,
+    },
   },
-  startTime: {
-    type: String,
-  },
-  endTime: {
-    type: String,
-  },
-});
+  { _id: false }
+);
 
 //OnDutySchema
 var onDutySchema = new Schema(

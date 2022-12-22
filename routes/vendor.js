@@ -39,6 +39,7 @@ const {
   base64ImageUpload,
   addMultipleImageToS3,
   deleteFormDataImage,
+  checkFormStatus,
 } = require("../controllers/vendor");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -94,6 +95,7 @@ router.delete("/pancardUrl", auth, isVendor, deletePancardUrl);
 router.put("/serviceRequested", auth, isVendor, requestForService);
 
 //*************************************loginVendorByIDPasword*************************************************************************//
+router.get("/checkFormStatus", auth, isVendor, checkFormStatus);
 router.post("/loginVendor2", loginVendor2);
 router.put("/updatePassword", auth, isVendor, updatePassword);
 

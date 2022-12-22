@@ -2143,3 +2143,36 @@ exports.addMultipleImageToS3 = async (req, res, next) => {
     });
   }
 };
+
+exports.checkFormStatus = async (req, res) => {
+  try {
+    const { id } = req.user;
+    let vendor = await Vendor.findById(id);
+    if (!vendor) {
+      return res.status(404).send({
+        success: true,
+        message: "Vendor Doesn't Exist",
+      });
+    }
+    if (vendor.requestStatus === "pending") {
+      return res.status(200).send({
+        success: true,
+        message:
+          "Your Form Is In Pending We Will Send The Accept/Reject Status Over Mail",
+      });
+    }
+    if (vendor.requestStatus === "rejected") {
+      return res.status(200).send({
+        success: true,
+        message: "Your Form Is Rejected",
+      });
+    }
+    res.status(200).send({
+      success: true,
+      message:
+        "Your Form Is Accepted You Can Proceed Further, Credentials Have Been Shared Over Mail Now You Can Login With Those Credentials Also ",
+    });
+  } catch (e) {
+    return res.status(500).send({ success: false, error: e.name });
+  }
+};
