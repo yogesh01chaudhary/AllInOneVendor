@@ -2154,7 +2154,13 @@ exports.checkFormStatus = async (req, res) => {
         message: "Vendor Doesn't Exist",
       });
     }
-    if (vendor.requestStatus === "pending") {
+    if (
+      vendor.requestedService.length !== 0 &&
+      vendor.services.length === 0 &&
+      !!vendor.firstName &&
+      !!vendor.email &&
+      vendor.requestStatus === "pending"
+    ) {
       return res.status(200).send({
         success: true,
         message:
@@ -2167,10 +2173,16 @@ exports.checkFormStatus = async (req, res) => {
         message: "Your Form Is Rejected",
       });
     }
+    if (vendor.requestStatus === "accepted") {
+      return res.status(200).send({
+        success: true,
+        message:
+          "Your Form Is Accepted You Can Proceed Further, Credentials Have Been Shared Over Mail Now You Can Login With Those Credentials Also ",
+      });
+    }
     res.status(200).send({
       success: true,
-      message:
-        "Your Form Is Accepted You Can Proceed Further, Credentials Have Been Shared Over Mail Now You Can Login With Those Credentials Also ",
+      message: "Please Fill All The Details",
     });
   } catch (e) {
     return res.status(500).send({ success: false, error: e.name });
