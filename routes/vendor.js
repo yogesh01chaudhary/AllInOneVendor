@@ -40,6 +40,8 @@ const {
   addMultipleImageToS3,
   deleteFormDataImage,
   checkFormStatus,
+  sendMailOTP,
+  verifyMailOTP,
 } = require("../controllers/vendor");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -55,6 +57,8 @@ router.put("/email", auth, isVendor, updateEmail);
 router.put("/bankDetails", auth, isVendor, addBankAccountDetails);
 router.put("/coordinates", auth, isVendor, updateCoordinates);
 
+router.put("/sendMail", auth, isVendor, sendMailOTP);
+router.post("/verifyMailOTP", auth, isVendor, verifyMailOTP);
 //*************************************PHOTO_UPLOAD***********************************************************************************//
 // //************************************express-fileupload***************************************************************************//
 router.put("/photo", auth, isVendor, uploadProfilePhoto);

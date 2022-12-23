@@ -9,6 +9,8 @@ const { v4: uuidv4 } = require("uuid");
 const AWS = require("aws-sdk");
 const { geocoder } = require("../helpers/geoCoder");
 const mongoose = require("mongoose");
+const Mail = require("../models/mail");
+const nodemailer = require("nodemailer");
 
 // ************************************Vendor************************************************************************************//
 //@desc login using number
@@ -2156,7 +2158,6 @@ exports.checkFormStatus = async (req, res) => {
     }
     if (
       vendor.requestedService.length !== 0 &&
-      vendor.services.length === 0 &&
       !!vendor.firstName &&
       !!vendor.email &&
       vendor.requestStatus === "pending"
@@ -2186,5 +2187,120 @@ exports.checkFormStatus = async (req, res) => {
     });
   } catch (e) {
     return res.status(500).send({ success: false, error: e.name });
+  }
+};
+
+//========================================= send otp to mail =======================================================//
+exports.sendMailOTP = async (req, res) => {
+  try {
+    const { body } = req;
+    const { error, value } = Joi.object()
+      .keys({
+        email: Joi.string().lowercase().trim().email().required(),
+      })
+      .required()
+      .validate(body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    let vendor = await Vendor.find({ email: value.email });
+    if (!vendor) {
+      return res.status(500).send({
+        success: false,
+        message: "Something went wrong",
+      });
+    }
+    if (vendor[0]) {
+      return res.status(400).send({
+        success: false,
+        message: "Email must be unique",
+      });
+    }
+    console.log(body);
+    const otp = Math.floor(100000 + Math.random() * 900000);
+    const createOTP = new Mail({
+      OTP: Number(otp),
+      email: body.email,
+    });
+    console.log(otp);
+    createOTP
+      .save()
+      .then(async (val) => {
+        console.log(val);
+        let transporter = await nodemailer.createTransport({
+          service: process.env.SERVICE,
+          host: process.env.HOST,
+          port: process.env.PORTMAIL,
+          secure: false,
+          auth: {
+            user: process.env.USER,
+            pass: process.env.PASSWORD,
+          },
+        });
+        console.log(transporter);
+        let info = await transporter.sendMail({
+          from: process.env.USER,
+          to: body.email,
+          subject: "OTP",
+          html: `Hi your OTP is ${otp}`,
+        });
+        console.log(info);
+        if (info.accepted.length !== 0) {
+          return res
+            .status(200)
+            .json({ message: "OTP sent successfully", id: val._id });
+        }
+        return res.status(500).json({ message: "Something went wrong" });
+      })
+      .catch((e) => {
+        res.status(500).send({ message: e.message });
+      });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+};
+
+//======================================= verify email otp =================================================//
+exports.verifyMailOTP = async (req, res) => {
+  try {
+    const { body } = req;
+    const { error, value } = Joi.object()
+      .keys({
+        // email: Joi.string().lowercase().trim().email().required(),
+        otp: Joi.number().required(),
+        id: Joi.string().required(),
+      })
+      .required()
+      .validate(body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    const verifyOTP = await Mail.findById(req.body.id);
+    if (!verifyOTP) {
+      return res.status(403).json({ message: "OTP expired" });
+    }
+    if (verifyOTP.OTP !== req.body.otp) {
+      return res.status(400).json({ message: "Wrong OTP" });
+    }
+    if (verifyOTP.OTP === req.body.otp) {
+      const updateEmail = await Vendor.findByIdAndUpdate(
+        req.user.id,
+        {
+          email: verifyOTP.email,
+        },
+        { new: true }
+      );
+      if (updateEmail) {
+        return res.status(200).json({ message: "Email successfully updated" });
+      }
+      return res.status(500).json({ message: "Something went wrong1" });
+    }
+    return res.status(500).json({ message: "Something went wrong2" });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
   }
 };
