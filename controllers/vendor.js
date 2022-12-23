@@ -2218,17 +2218,14 @@ exports.sendMailOTP = async (req, res) => {
         message: "Email must be unique",
       });
     }
-    console.log(body);
     const otp = Math.floor(100000 + Math.random() * 900000);
     const createOTP = new Mail({
       OTP: Number(otp),
       email: body.email,
     });
-    console.log(otp);
     createOTP
       .save()
       .then(async (val) => {
-        console.log(val);
         let transporter = await nodemailer.createTransport({
           service: process.env.SERVICE,
           host: process.env.HOST,
@@ -2239,14 +2236,12 @@ exports.sendMailOTP = async (req, res) => {
             pass: process.env.PASSWORD,
           },
         });
-        console.log(transporter);
         let info = await transporter.sendMail({
           from: process.env.USER,
           to: body.email,
           subject: "OTP",
           html: `Hi your OTP is ${otp}`,
         });
-        console.log(info);
         if (info.accepted.length !== 0) {
           return res
             .status(200)
