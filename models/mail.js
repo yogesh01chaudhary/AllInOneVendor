@@ -7,8 +7,11 @@ const mailSchema = new Schema({
   email: {
     type: String,
     required: true,
-    // unique:true,
   },
-  createdAt: { type: Date, expires: "2m", default: Date.now },
+  createdAt: {
+    type: Date,
+    expires: `${process.env.MAIL_OTP_EXPIRY}`,
+    default: Date.now,
+  },
 });
 module.exports = model("mail", mailSchema);
