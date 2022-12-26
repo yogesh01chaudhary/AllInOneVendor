@@ -11,6 +11,7 @@ const { geocoder } = require("../helpers/geoCoder");
 const mongoose = require("mongoose");
 const Mail = require("../models/mail");
 const nodemailer = require("nodemailer");
+const emailValidator = require("deep-email-validator");
 
 // ************************************Vendor************************************************************************************//
 //@desc login using number
@@ -2205,6 +2206,19 @@ exports.sendMailOTP = async (req, res) => {
         .status(400)
         .send({ success: false, message: error.details[0].message });
     }
+
+    async function isEmailValid(email) {
+      return emailValidator.validate(email);
+    }
+
+    const { valid, reason, validators } = await isEmailValid(value.email);
+
+    if (!valid)
+      return res.status(400).send({
+        message: "Please provide a valid email address.",
+        reason: validators[reason].reason,
+      });
+
     let vendor = await Vendor.find({ email: value.email });
     if (!vendor) {
       return res.status(500).send({
@@ -2221,7 +2235,7 @@ exports.sendMailOTP = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000);
     const createOTP = new Mail({
       OTP: Number(otp),
-      email: body.email,
+      email: value.email,
     });
     createOTP
       .save()
@@ -2238,7 +2252,7 @@ exports.sendMailOTP = async (req, res) => {
         });
         let info = await transporter.sendMail({
           from: process.env.USER,
-          to: body.email,
+          to: value.email,
           subject: "OTP",
           html: `Hi your OTP is ${otp}`,
         });
@@ -2247,7 +2261,9 @@ exports.sendMailOTP = async (req, res) => {
             .status(200)
             .json({ message: "OTP sent successfully", id: val._id });
         }
-        return res.status(500).json({ message: "Something went wrong" });
+        return res.status(500).json({
+          message: "Something went wrong",
+        });
       })
       .catch((e) => {
         res.status(500).send({ message: e.message });
