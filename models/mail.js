@@ -10,7 +10,7 @@ const mailSchema = new Schema({
   },
   createdAt: {
     type: Date,
-    expires: `${process.env.MAIL_OTP_EXPIRY}`,
+    expires: "5m",
     default: Date.now,
   },
 });
