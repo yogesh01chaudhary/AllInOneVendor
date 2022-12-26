@@ -2279,8 +2279,7 @@ exports.verifyMailOTP = async (req, res) => {
     const { body } = req;
     const { error, value } = Joi.object()
       .keys({
-        // email: Joi.string().lowercase().trim().email().required(),
-        otp: Joi.number().required(),
+        otp: Joi.number().integer().required(),
         id: Joi.string().required(),
       })
       .required()
@@ -2290,14 +2289,14 @@ exports.verifyMailOTP = async (req, res) => {
         .status(400)
         .send({ success: false, message: error.details[0].message });
     }
-    const verifyOTP = await Mail.findById(req.body.id);
+    const verifyOTP = await Mail.findById(body.id);
     if (!verifyOTP) {
       return res.status(403).json({ message: "OTP expired" });
     }
-    if (verifyOTP.OTP !== req.body.otp) {
+    if (verifyOTP.OTP !== +body.otp) {
       return res.status(400).json({ message: "Wrong OTP" });
     }
-    if (verifyOTP.OTP === req.body.otp) {
+    if (verifyOTP.OTP === +body.otp) {
       const updateEmail = await Vendor.findByIdAndUpdate(
         req.user.id,
         {
