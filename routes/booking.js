@@ -7,6 +7,7 @@ const {
   transferCount,
   bookingStartTime,
   bookingImageUpload,
+  getBookingsById,
 } = require("../controllers/booking");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -18,6 +19,7 @@ router.put("/confirm", auth, isVendor, confirmBooking);
 router.put("/transfer", auth, isVendor, transferBooking);
 router.put("/complete", auth, isVendor, completeBooking);
 router.get("/", auth, isVendor, getBookingsVendor);
+router.get("/:bookingId", auth, isVendor, getBookingsById);
 
 //testing
 router.put("/transferCount", auth, isVendor, transferCount);

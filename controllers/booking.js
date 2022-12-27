@@ -519,6 +519,111 @@ exports.getBookingsVendor = async (req, res) => {
   }
 };
 
+// @desc see  all booking of an user using userId
+// @route GET vendor/booking/:bookingId
+// @acess Private
+exports.getBookingsById = async (req, res) => {
+  try {
+    const { params } = req;
+    let matchQuery = {
+      $match: { _id: mongoose.Types.ObjectId(params.bookingId) },
+    };
+
+    let data = await Booking.aggregate([
+      {
+        $facet: {
+          totalData: [
+            matchQuery,
+            { $project: { __v: 0 } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: "userData",
+              },
+            },
+            {
+              $lookup: {
+                from: "services",
+                localField: "service",
+                foreignField: "_id",
+                as: "serviceData",
+              },
+            },
+            // {
+            //   $lookup: {
+            //     from: "vendors",
+            //     localField: "vendor",
+            //     foreignField: "_id",
+            //     as: "vendorData",
+            //   },
+            // },
+          ],
+          // totalCount: [matchQuery, { $count: "count" }],
+        },
+      },
+    ]);
+
+    let result = data[0].totalData;
+    // let count = data[0].totalCount;
+
+    if (result.length === 0) {
+      return res.status(200).send({ success: false, message: "No Data Found" });
+    }
+
+    result = result[0];
+
+    let package;
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].silver._id.toString()
+    ) {
+      package = result.serviceData[0].silver;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].gold._id.toString()
+    ) {
+      package = result.serviceData[0].gold;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].platinum._id.toString()
+    ) {
+      package = result.serviceData[0].platinum;
+    }
+
+    result = {
+      _id: result._id,
+      // userId: result.userId,
+      service: result.service,
+      item: result.item,
+      package,
+      timeSlot: result.timeSlot,
+      total: result.total,
+      bookngStatus: result.bookingStatus,
+      payBy: result.payBy,
+      paid: result.paid,
+      paymentStatus: result.paymentStatus,
+      bookingVerificationImage: result.bookingVerificationImage,
+      userData: result.userData[0],
+    };
+
+    return res.status(200).send({
+      success: true,
+      message: "Bookings Fetched Successfully",
+      result,
+    });
+  } catch (e) {
+    return res.status(500).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
 // TESTING
 //@desc admin send booking to nearbyvendors and vendor will transfer the booking and admin will hit api to find nearby vendors and then vendors will confirm/transfer
 //@route PUT vendor/booking/transferCount
