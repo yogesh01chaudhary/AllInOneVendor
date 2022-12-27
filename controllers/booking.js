@@ -431,6 +431,14 @@ exports.completeBooking = async (req, res) => {
           // "bookings.$[elem].startTime": Date.now() + 60 * 60 * 24 * 1000,
           "bookings.$[elem].endTime": Date.now(),
         },
+        $pull: {
+          timeSlot: {
+            start: result.timeSlot.start,
+            end: result.timeSlot.end,
+            bookingDate: result.timeSlot.bookingDate,
+            booked: true,
+          },
+        },
       },
       {
         arrayFilters: [
@@ -507,6 +515,165 @@ exports.getBookingsVendor = async (req, res) => {
 
     let matchQuery = {
       $match: { vendor: mongoose.Types.ObjectId(user.id) },
+    };
+
+    let data = await Booking.aggregate([
+      {
+        $facet: {
+          totalData: [
+            matchQuery,
+            { $project: { __v: 0 } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: "userData",
+              },
+            },
+            {
+              $lookup: {
+                from: "services",
+                localField: "service",
+                foreignField: "_id",
+                as: "serviceData",
+              },
+            },
+            {
+              $lookup: {
+                from: "vendors",
+                localField: "vendor",
+                foreignField: "_id",
+                as: "vendorData",
+              },
+            },
+          ],
+          totalCount: [matchQuery, { $count: "count" }],
+        },
+      },
+    ]);
+
+    let result = data[0].totalData;
+    let count = data[0].totalCount;
+
+    if (result.length === 0) {
+      return res.status(200).send({ success: false, message: "No Data Found" });
+    }
+
+    return res.status(200).send({
+      success: true,
+      message: "Bookings Fetched Successfully",
+      result,
+      count,
+    });
+  } catch (e) {
+    return res.status(500).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
+// @desc see  all booking of an user using userId
+// @route GET vendor/booking/today
+// @acess Private
+exports.getTodayBookings = async (req, res) => {
+  try {
+    const { user } = req;
+
+    let date = `${new Date().getDate() - 2}/${
+      new Date().getMonth() + 1
+    }/${new Date().getFullYear()}`;
+    console.log(date);
+    let matchQuery = {
+      $match: {
+        $and: [
+          { vendor: mongoose.Types.ObjectId(user.id) },
+          { "timeSlot.bookingDate": date },
+        ],
+      },
+    };
+
+    let data = await Booking.aggregate([
+      {
+        $facet: {
+          totalData: [
+            matchQuery,
+            { $project: { __v: 0 } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: "userData",
+              },
+            },
+            {
+              $lookup: {
+                from: "services",
+                localField: "service",
+                foreignField: "_id",
+                as: "serviceData",
+              },
+            },
+            {
+              $lookup: {
+                from: "vendors",
+                localField: "vendor",
+                foreignField: "_id",
+                as: "vendorData",
+              },
+            },
+          ],
+          totalCount: [matchQuery, { $count: "count" }],
+        },
+      },
+    ]);
+
+    let result = data[0].totalData;
+    let count = data[0].totalCount;
+
+    if (result.length === 0) {
+      return res.status(200).send({ success: false, message: "No Data Found" });
+    }
+
+    return res.status(200).send({
+      success: true,
+      message: "Bookings Fetched Successfully",
+      result,
+      count,
+    });
+  } catch (e) {
+    return res.status(500).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
+// @desc see  all booking of an user using userId
+// @route GET vendor/booking/upcoming
+// @acess Private
+exports.getUpcomingBookings = async (req, res) => {
+  try {
+    const { user } = req;
+
+    let date = `${new Date().getDate() - 2}/${
+      new Date().getMonth() + 1
+    }/${new Date().getFullYear()}`;
+    console.log(date);
+    let matchQuery = {
+      $match: {
+        $and: [
+          { vendor: mongoose.Types.ObjectId(user.id) },
+          {
+            bookingStatus: "Confirmed",
+          },
+          // { $expr: { $ne: { "timeSlot.bookingDate": date } } },
+        ],
+      },
     };
 
     let data = await Booking.aggregate([
