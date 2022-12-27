@@ -157,11 +157,12 @@ exports.confirmBooking = async (req, res) => {
 //@route PUT vendor/booking/transferBooking
 //@access Private
 exports.transferBooking = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     const { body, user } = req;
     const { error } = Joi.object()
       .keys({
-        booking: Joi.string().required(),
+        bookingId: Joi.string().required(),
       })
       .required()
       .validate(body);
@@ -174,7 +175,12 @@ exports.transferBooking = async (req, res) => {
       $match: {
         $and: [
           { _id: mongoose.Types.ObjectId(body.bookingId) },
-          { bookingStatus: "Pending" },
+          {
+            $or: [
+              { bookingStatus: "Pending" },
+              { bookingStatus: "Transferred" },
+            ],
+          },
         ],
       },
     };
@@ -213,9 +219,11 @@ exports.transferBooking = async (req, res) => {
         .status(400)
         .send({ success: false, message: "Vendor Not Found" });
     }
+
+    session.startTransaction();
     if (!vendor.transferCount) {
       let transferCount = new TransferCount({ vendor: user.id, count: 1 });
-      transferCount = await transferCount.save();
+      transferCount = await transferCount.save({ session });
       if (!transferCount) {
         return res.status(400).send({
           success: false,
@@ -228,8 +236,18 @@ exports.transferBooking = async (req, res) => {
           transferCount: transferCount._id,
           $addToSet: { transferredBookings: body.bookingId },
         },
-        { new: true }
+        { new: true, session }
       );
+      await Booking.findByIdAndUpdate(
+        body.bookingId,
+        {
+          bookingStatus: "Transferred",
+        },
+        { new: true, session }
+      );
+
+      await session.commitTransaction();
+      await session.endSession();
       return res.status(200).send({
         success: true,
         message: "Transfer",
@@ -241,7 +259,7 @@ exports.transferBooking = async (req, res) => {
     let transferCount = await TransferCount.findById(vendor.transferCount);
     if (!transferCount) {
       let transferCount = new TransferCount({ vendor: user.id, count: 1 });
-      transferCount = await transferCount.save();
+      transferCount = await transferCount.save({ session });
       if (!transferCount) {
         return res.status(400).send({
           success: false,
@@ -254,8 +272,18 @@ exports.transferBooking = async (req, res) => {
           transferCount: transferCount._id,
           $addToSet: { transferredBookings: body.bookingId },
         },
-        { new: true }
+        { new: true, session }
       );
+      await Booking.findByIdAndUpdate(
+        body.bookingId,
+        {
+          bookingStatus: "Transferred",
+        },
+        { new: true, session }
+      );
+
+      await session.commitTransaction();
+      await session.endSession();
       return res.status(200).send({
         success: true,
         message: "Transfer",
@@ -271,15 +299,25 @@ exports.transferBooking = async (req, res) => {
           count: transferCount.count + 1,
           $addToSet: { transferredBookings: body.bookingId },
         },
-        { new: true }
+        { new: true, session }
       );
       vendor = await Vendor.findByIdAndUpdate(
         user.id,
         {
           $addToSet: { transferredBookings: body.bookingId },
         },
-        { new: true }
+        { new: true, session }
       );
+      await Booking.findByIdAndUpdate(
+        body.bookingId,
+        {
+          bookingStatus: "Transferred",
+        },
+        { new: true, session }
+      );
+
+      await session.commitTransaction();
+      await session.endSession();
       return res.status(200).send({
         success: true,
         message: "Transfer",
@@ -288,6 +326,9 @@ exports.transferBooking = async (req, res) => {
         count: transferCount.count,
       });
     }
+
+    await session.commitTransaction();
+    await session.endSession();
     return res.status(200).send({
       success: true,
       message:
@@ -297,6 +338,8 @@ exports.transferBooking = async (req, res) => {
       count: transferCount.count,
     });
   } catch (e) {
+    await session.abortTransaction();
+    await session.endSession();
     return res.status(400).send({
       success: false,
       message: "Something went wrong",
