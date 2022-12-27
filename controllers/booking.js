@@ -560,6 +560,53 @@ exports.getBookingsVendor = async (req, res) => {
       return res.status(200).send({ success: false, message: "No Data Found" });
     }
 
+    result = result[0];
+
+    let package;
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].silver._id.toString()
+    ) {
+      package = result.serviceData[0].silver;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].gold._id.toString()
+    ) {
+      package = result.serviceData[0].gold;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].platinum._id.toString()
+    ) {
+      package = result.serviceData[0].platinum;
+    }
+
+    result = {
+      // _id: result._id,
+      // packageName: package.description,
+      // bookingDate: result.timeSlot.bookingDate,
+      // time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
+      // userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+      // address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
+      // location: result.userData[0].location.coordinates,
+
+      _id: result._id,
+      userId: result.userId,
+      service: result.service,
+      item: result.item,
+      package,
+      timeSlot: result.timeSlot,
+      total: result.total,
+      bookingStatus: result.bookingStatus,
+      payby: result.payby,
+      paid: result.paid,
+      paymentStatus: result.paymentStatus,
+      bookingVerificationImage: result.bookingVerificationImage,
+      userData: result.userData[0],
+      vendorData: result.vendorData[0],
+    };
+
     return res.status(200).send({
       success: true,
       message: "Bookings Fetched Successfully",
@@ -581,8 +628,7 @@ exports.getBookingsVendor = async (req, res) => {
 exports.getTodayBookings = async (req, res) => {
   try {
     const { user } = req;
-
-    let date = `${new Date().getDate() - 2}/${
+    let date = `${new Date().getDate()}/${
       new Date().getMonth() + 1
     }/${new Date().getFullYear()}`;
     console.log(date);
@@ -637,7 +683,52 @@ exports.getTodayBookings = async (req, res) => {
     if (result.length === 0) {
       return res.status(200).send({ success: false, message: "No Data Found" });
     }
+    result = result[0];
 
+    let package;
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].silver._id.toString()
+    ) {
+      package = result.serviceData[0].silver;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].gold._id.toString()
+    ) {
+      package = result.serviceData[0].gold;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].platinum._id.toString()
+    ) {
+      package = result.serviceData[0].platinum;
+    }
+
+    result = {
+      // _id: result._id,
+      // packageName: package.description,
+      // bookingDate: result.timeSlot.bookingDate,
+      // time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
+      // userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+      // address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
+      // location: result.userData[0].location.coordinates,
+
+      _id: result._id,
+      userId: result.userId,
+      service: result.service,
+      item: result.item,
+      package,
+      timeSlot: result.timeSlot,
+      total: result.total,
+      bookingStatus: result.bookingStatus,
+      payby: result.payby,
+      paid: result.paid,
+      paymentStatus: result.paymentStatus,
+      bookingVerificationImage: result.bookingVerificationImage,
+      userData: result.userData[0],
+      vendorData: result.vendorData[0],
+    };
     return res.status(200).send({
       success: true,
       message: "Bookings Fetched Successfully",
@@ -660,7 +751,7 @@ exports.getUpcomingBookings = async (req, res) => {
   try {
     const { user } = req;
 
-    let date = `${new Date().getDate() - 2}/${
+    let date = `${new Date().getDate()}/${
       new Date().getMonth() + 1
     }/${new Date().getFullYear()}`;
     console.log(date);
@@ -671,7 +762,7 @@ exports.getUpcomingBookings = async (req, res) => {
           {
             bookingStatus: "Confirmed",
           },
-          // { $expr: { $ne: { "timeSlot.bookingDate": date } } },
+          { "timeSlot.bookingDate": { $gt: date } },
         ],
       },
     };
@@ -718,7 +809,52 @@ exports.getUpcomingBookings = async (req, res) => {
     if (result.length === 0) {
       return res.status(200).send({ success: false, message: "No Data Found" });
     }
+    result = result[0];
 
+    let package;
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].silver._id.toString()
+    ) {
+      package = result.serviceData[0].silver;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].gold._id.toString()
+    ) {
+      package = result.serviceData[0].gold;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].platinum._id.toString()
+    ) {
+      package = result.serviceData[0].platinum;
+    }
+
+    result = {
+      // _id: result._id,
+      // packageName: package.description,
+      // bookingDate: result.timeSlot.bookingDate,
+      // time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
+      // userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+      // address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
+      // location: result.userData[0].location.coordinates,
+
+      _id: result._id,
+      userId: result.userId,
+      service: result.service,
+      item: result.item,
+      package,
+      timeSlot: result.timeSlot,
+      total: result.total,
+      bookingStatus: result.bookingStatus,
+      payby: result.payby,
+      paid: result.paid,
+      paymentStatus: result.paymentStatus,
+      bookingVerificationImage: result.bookingVerificationImage,
+      userData: result.userData[0],
+      vendorData: result.vendorData[0],
+    };
     return res.status(200).send({
       success: true,
       message: "Bookings Fetched Successfully",
