@@ -30,7 +30,12 @@ exports.confirmBooking = async (req, res) => {
       $match: {
         $and: [
           { _id: mongoose.Types.ObjectId(body.booking) },
-          { bookingStatus: "Pending" },
+          {
+            $or: [
+              { bookingStatus: "Pending" },
+              { bookingStatus: "Transferred" },
+            ],
+          },
         ],
       },
     };
@@ -84,7 +89,7 @@ exports.confirmBooking = async (req, res) => {
         $addToSet: {
           bookings: { bookingId: new mongoose.Types.ObjectId(body.booking) },
         },
-        $addToSet: {
+        $push: {
           timeSlot: {
             start: result.timeSlot.start,
             end: result.timeSlot.end,
@@ -138,9 +143,9 @@ exports.confirmBooking = async (req, res) => {
     return res.status(200).send({
       success: true,
       message: "Booking Confirmed",
-      booking,
-      vendor,
-      mailResponse,
+      // booking,
+      // vendor,
+      // mailResponse,
     });
   } catch (e) {
     await session.abortTransaction();
