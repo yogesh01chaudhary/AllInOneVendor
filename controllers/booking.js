@@ -551,14 +551,109 @@ exports.getBookingsById = async (req, res) => {
                 as: "serviceData",
               },
             },
-            // {
-            //   $lookup: {
-            //     from: "vendors",
-            //     localField: "vendor",
-            //     foreignField: "_id",
-            //     as: "vendorData",
-            //   },
-            // },
+          ],
+          // totalCount: [matchQuery, { $count: "count" }],
+        },
+      },
+    ]);
+
+    let result = data[0].totalData;
+
+    if (result.length === 0) {
+      return res.status(200).send({ success: false, message: "No Data Found" });
+    }
+
+    result = result[0];
+
+    let package;
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].silver._id.toString()
+    ) {
+      package = result.serviceData[0].silver;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].gold._id.toString()
+    ) {
+      package = result.serviceData[0].gold;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].platinum._id.toString()
+    ) {
+      package = result.serviceData[0].platinum;
+    }
+
+    result = {
+      _id: result._id,
+      packageName: package.description,
+      bookingDate: result.timeSlot.bookingDate,
+      time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
+      userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+      address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
+      location: result.userData[0].location.coordinates,
+    };
+
+    return res.status(200).send({
+      success: true,
+      message: "Bookings Fetched Successfully",
+      result,
+    });
+  } catch (e) {
+    return res.status(500).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
+// @desc see  all booking of an user using userId
+// @route GET vendor/booking/confirmed
+// @acess Private
+exports.getConfirmedBookings = async (req, res) => {
+  try {
+    const { user } = req;
+    let matchQuery = {
+      $match: {
+        $and: [
+          { vendor: mongoose.Types.ObjectId(user.id) },
+          { bookingStatus: "Confirmed" },
+        ],
+      },
+    };
+
+    let data = await Booking.aggregate([
+      {
+        $facet: {
+          totalData: [
+            matchQuery,
+            { $project: { __v: 0 } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: "userData",
+              },
+            },
+            {
+              $lookup: {
+                from: "services",
+                localField: "service",
+                foreignField: "_id",
+                as: "serviceData",
+              },
+            },
+            {
+              $lookup: {
+                from: "vendors",
+                localField: "vendor",
+                foreignField: "_id",
+                as: "vendorData",
+              },
+            },
           ],
           // totalCount: [matchQuery, { $count: "count" }],
         },
@@ -602,12 +697,14 @@ exports.getBookingsById = async (req, res) => {
       package,
       timeSlot: result.timeSlot,
       total: result.total,
-      bookngStatus: result.bookingStatus,
-      payBy: result.payBy,
+      bookingStatus: result.bookingStatus,
+      payby: result.payby,
       paid: result.paid,
       paymentStatus: result.paymentStatus,
       bookingVerificationImage: result.bookingVerificationImage,
       userData: result.userData[0],
+      userName: `${result.userData[0].firstName}  ${result.userData[0].lastName}`,
+      vendorData: result.vendorData[0],
     };
 
     return res.status(200).send({

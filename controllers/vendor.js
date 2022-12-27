@@ -399,6 +399,33 @@ exports.requestForService = async (req, res) => {
   }
 };
 
+//@desc vendor Request For Services
+//@route PUT/vendor/profile
+//@access Private
+exports.getMyProfile = async (req, res) => {
+  try {
+    const myProfile = await Vendor.findById(req.user.id);
+    if (myProfile) {
+      return res.status(200).json({
+        success: true,
+        message: "Profile Fetched Successfully",
+        result: myProfile,
+      });
+    }
+    return res
+      .status(404)
+      .json({ success: false, message: "Vendor Doesn't Exist" });
+  } catch (e) {
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "Something went wrong",
+        error: e.message,
+      });
+  }
+};
+
 //@desc login with vendor's Id password after admin's confirmtion admin send the Id and password over mail
 //@route PUT/vendor/login2
 //@access Private

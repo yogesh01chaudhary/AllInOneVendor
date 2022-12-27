@@ -8,6 +8,7 @@ const {
   bookingStartTime,
   bookingImageUpload,
   getBookingsById,
+  getConfirmedBookings,
 } = require("../controllers/booking");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -19,6 +20,7 @@ router.put("/confirm", auth, isVendor, confirmBooking);
 router.put("/transfer", auth, isVendor, transferBooking);
 router.put("/complete", auth, isVendor, completeBooking);
 router.get("/", auth, isVendor, getBookingsVendor);
+router.get("/confirmed", auth, isVendor, getConfirmedBookings);
 router.get("/:bookingId", auth, isVendor, getBookingsById);
 
 //testing
