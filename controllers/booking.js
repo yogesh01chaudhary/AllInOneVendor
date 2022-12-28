@@ -553,97 +553,84 @@ exports.getBookingsVendor = async (req, res) => {
       },
     ]);
 
-    let result = data[0].totalData;
+    let resultData = data[0].totalData;
     let count = data[0].totalCount;
 
-    if (result.length === 0) {
+    if (resultData.length === 0) {
       return res.status(200).send({ success: false, message: "No Data Found" });
     }
 
-    result = result[0];
-
     let package;
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].silver._id.toString()
-    ) {
-      package = result.serviceData[0].silver;
-    }
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].gold._id.toString()
-    ) {
-      package = result.serviceData[0].gold;
-    }
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].platinum._id.toString()
-    ) {
-      package = result.serviceData[0].platinum;
-    }
-    // console.log(result.userData[0].dateOfBirth);
+    let newData = [];
+    for (let result of resultData) {
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].silver._id.toString()
+      ) {
+        package = result.serviceData[0].silver;
+      }
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].gold._id.toString()
+      ) {
+        package = result.serviceData[0].gold;
+      }
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].platinum._id.toString()
+      ) {
+        package = result.serviceData[0].platinum;
+      }
 
-    // let age =
-    //   new Date().getFullYear() -
-    //   new Date(result.userData[0].dateOfBirth).getFullYear();
-    // console.log(age);
+      var dob = new Date(
+        result.userData[0].dateOfBirth.split("/").reverse().join("/")
+      );
+      var year = dob.getFullYear();
+      var month = dob.getMonth();
+      var day = dob.getDate();
+      var today = new Date();
+      var age = today.getFullYear() - year;
 
-    // console.log(result.userData[0].dateOfBirth.split("/").reverse().join("/"));
-    var dob = new Date(
-      result.userData[0].dateOfBirth.split("/").reverse().join("/")
-    );
-    var year = dob.getFullYear();
-    var month = dob.getMonth();
-    var day = dob.getDate();
-    var today = new Date();
-    var age = today.getFullYear() - year;
-    // console.log(
-    //   dob,
-    //   year,
-    //   month,
-    //   day,
-    //   today,
-    //   age,
-    //   today.getFullYear(),
-    //   today.getMonth(),
-    //   today.getDate()
-    // );
-    if (
-      today.getMonth() < month ||
-      (today.getMonth() == month && today.getDate() < day)
-    ) {
-      age--;
+      if (
+        today.getMonth() < month ||
+        (today.getMonth() == month && today.getDate() < day)
+      ) {
+        age--;
+      }
+
+      let newResult = {
+        bookingId: result._id,
+        serviceName: package.description,
+        bookingDate: result.timeSlot.bookingDate,
+        time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
+        userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+        age,
+        mobile: result.userData[0].phone,
+        gender: result.userData[0].gender,
+        bookingStatus: result.bookingStatus,
+        address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
+        location: result.userData[0].location.coordinates,
+        userId: result.userId,
+        service: result.service,
+        packageId: package._id,
+        amountToBePaid: result.total,
+        payby: result.payby,
+        paid: result.paid,
+        paymentStatus: result.paymentStatus,
+        // item: result.item,
+        // package,
+        // timeSlot: result.timeSlot,
+        // bookingVerificationImage: result.bookingVerificationImage,
+        // userData: result.userData[0],
+        // vendorData: result.vendorData[0],
+      };
+      newData.push(newResult);
     }
 
-    result = {
-      bookingId: result._id,
-      serviceName: package.description,
-      bookingDate: result.timeSlot.bookingDate,
-      time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
-      userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
-      age,
-      mobile: result.userData[0].phone,
-      gender: result.userData[0].gender,
-      bookingStatus: result.bookingStatus,
-      address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
-      location: result.userData[0].location.coordinates,
-      userId: result.userId,
-      service: result.service,
-      // item: result.item,
-      // package,
-      // timeSlot: result.timeSlot,
-      amountToBePaid: result.total,
-      payby: result.payby,
-      paid: result.paid,
-      paymentStatus: result.paymentStatus,
-      // bookingVerificationImage: result.bookingVerificationImage,
-      // userData: result.userData[0],
-      // vendorData: result.vendorData[0],
-    };
     return res.status(200).send({
       success: true,
       message: "Bookings Fetched Successfully",
-      result,
+      newData,
       count,
     });
   } catch (e) {
@@ -710,67 +697,84 @@ exports.getTodayBookings = async (req, res) => {
       },
     ]);
 
-    let result = data[0].totalData;
+    let resultData = data[0].totalData;
     let count = data[0].totalCount;
 
-    if (result.length === 0) {
+    if (resultData.length === 0) {
       return res.status(200).send({ success: false, message: "No Data Found" });
     }
-    result = result[0];
 
     let package;
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].silver._id.toString()
-    ) {
-      package = result.serviceData[0].silver;
-    }
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].gold._id.toString()
-    ) {
-      package = result.serviceData[0].gold;
-    }
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].platinum._id.toString()
-    ) {
-      package = result.serviceData[0].platinum;
+    let newData = [];
+    for (let result of resultData) {
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].silver._id.toString()
+      ) {
+        package = result.serviceData[0].silver;
+      }
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].gold._id.toString()
+      ) {
+        package = result.serviceData[0].gold;
+      }
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].platinum._id.toString()
+      ) {
+        package = result.serviceData[0].platinum;
+      }
+
+      var dob = new Date(
+        result.userData[0].dateOfBirth.split("/").reverse().join("/")
+      );
+      var year = dob.getFullYear();
+      var month = dob.getMonth();
+      var day = dob.getDate();
+      var today = new Date();
+      var age = today.getFullYear() - year;
+
+      if (
+        today.getMonth() < month ||
+        (today.getMonth() == month && today.getDate() < day)
+      ) {
+        age--;
+      }
+
+      let newResult = {
+        bookingId: result._id,
+        serviceName: package.description,
+        bookingDate: result.timeSlot.bookingDate,
+        time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
+        userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+        age,
+        mobile: result.userData[0].phone,
+        gender: result.userData[0].gender,
+        bookingStatus: result.bookingStatus,
+        address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
+        location: result.userData[0].location.coordinates,
+        userId: result.userId,
+        service: result.service,
+        packageId: package._id,
+        amountToBePaid: result.total,
+        payby: result.payby,
+        paid: result.paid,
+        paymentStatus: result.paymentStatus,
+        // item: result.item,
+        // package,
+        // timeSlot: result.timeSlot,
+        // bookingVerificationImage: result.bookingVerificationImage,
+        // userData: result.userData[0],
+        // vendorData: result.vendorData[0],
+      };
+      newData.push(newResult);
     }
 
-    let age =
-      new Date().getFullYear() -
-      new Date(result.userData[0].dateOfBirth).getFullYear;
-    console.log(age);
-    result = {
-      bookingId: result._id,
-      serviceName: package.description,
-      bookingDate: result.timeSlot.bookingDate,
-      time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
-      userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
-      age,
-      mobile: result.userData[0].phone,
-      gender: result.userData[0].gender,
-      bookingStatus: result.bookingStatus,
-      address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
-      location: result.userData[0].location.coordinates,
-      userId: result.userId,
-      service: result.service,
-      // item: result.item,
-      // package,
-      // timeSlot: result.timeSlot,
-      amountToBePaid: result.total,
-      payby: result.payby,
-      paid: result.paid,
-      paymentStatus: result.paymentStatus,
-      // bookingVerificationImage: result.bookingVerificationImage,
-      // userData: result.userData[0],
-      // vendorData: result.vendorData[0],
-    };
     return res.status(200).send({
       success: true,
       message: "Bookings Fetched Successfully",
-      result,
+      newData,
       count,
     });
   } catch (e) {
@@ -841,69 +845,84 @@ exports.getUpcomingBookings = async (req, res) => {
       },
     ]);
 
-    let result = data[0].totalData;
+    let resultData = data[0].totalData;
     let count = data[0].totalCount;
 
-    if (result.length === 0) {
+    if (resultData.length === 0) {
       return res.status(200).send({ success: false, message: "No Data Found" });
     }
-    result = result[0];
 
     let package;
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].silver._id.toString()
-    ) {
-      package = result.serviceData[0].silver;
-    }
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].gold._id.toString()
-    ) {
-      package = result.serviceData[0].gold;
-    }
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].platinum._id.toString()
-    ) {
-      package = result.serviceData[0].platinum;
+    let newData = [];
+    for (let result of resultData) {
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].silver._id.toString()
+      ) {
+        package = result.serviceData[0].silver;
+      }
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].gold._id.toString()
+      ) {
+        package = result.serviceData[0].gold;
+      }
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].platinum._id.toString()
+      ) {
+        package = result.serviceData[0].platinum;
+      }
+
+      var dob = new Date(
+        result.userData[0].dateOfBirth.split("/").reverse().join("/")
+      );
+      var year = dob.getFullYear();
+      var month = dob.getMonth();
+      var day = dob.getDate();
+      var today = new Date();
+      var age = today.getFullYear() - year;
+
+      if (
+        today.getMonth() < month ||
+        (today.getMonth() == month && today.getDate() < day)
+      ) {
+        age--;
+      }
+
+      let newResult = {
+        bookingId: result._id,
+        serviceName: package.description,
+        bookingDate: result.timeSlot.bookingDate,
+        time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
+        userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+        age,
+        mobile: result.userData[0].phone,
+        gender: result.userData[0].gender,
+        bookingStatus: result.bookingStatus,
+        address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
+        location: result.userData[0].location.coordinates,
+        userId: result.userId,
+        service: result.service,
+        packageId: package._id,
+        amountToBePaid: result.total,
+        payby: result.payby,
+        paid: result.paid,
+        paymentStatus: result.paymentStatus,
+        // item: result.item,
+        // package,
+        // timeSlot: result.timeSlot,
+        // bookingVerificationImage: result.bookingVerificationImage,
+        // userData: result.userData[0],
+        // vendorData: result.vendorData[0],
+      };
+      newData.push(newResult);
     }
 
-    console.log(result.userData[0]);
-
-    let age =
-      new Date().getFullYear() -
-      new Date(result.userData[0].dateOfBirth).getFullYear();
-    console.log(age);
-    result = {
-      bookingId: result._id,
-      serviceName: package.description,
-      bookingDate: result.timeSlot.bookingDate,
-      time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
-      userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
-      age,
-      mobile: result.userData[0].phone,
-      gender: result.userData[0].gender,
-      bookingStatus: result.bookingStatus,
-      address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
-      location: result.userData[0].location.coordinates,
-      userId: result.userId,
-      service: result.service,
-      // item: result.item,
-      // package,
-      // timeSlot: result.timeSlot,
-      amountToBePaid: result.total,
-      payby: result.payby,
-      paid: result.paid,
-      paymentStatus: result.paymentStatus,
-      // bookingVerificationImage: result.bookingVerificationImage,
-      // userData: result.userData[0],
-      // vendorData: result.vendorData[0],
-    };
     return res.status(200).send({
       success: true,
       message: "Bookings Fetched Successfully",
-      result,
+      newData,
       count,
     });
   } catch (e) {
