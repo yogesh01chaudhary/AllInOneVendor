@@ -406,23 +406,30 @@ exports.getMyProfile = async (req, res) => {
   try {
     const myProfile = await Vendor.findById(req.user.id);
     if (myProfile) {
+      let result = {
+        UID: myProfile._id,
+        name: `${myProfile.firstName} ${myProfile.lastName}`,
+        DOB: myProfile.DOB,
+        email: myProfile.email,
+        mobileNumber: myProfile.mobileNumber,
+        city: myProfile.currentAddress.city,
+        imageUrl: myProfile.imageUrl,
+      };
       return res.status(200).json({
         success: true,
         message: "Profile Fetched Successfully",
-        result: myProfile,
+        result,
       });
     }
     return res
       .status(404)
       .json({ success: false, message: "Vendor Doesn't Exist" });
   } catch (e) {
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Something went wrong",
-        error: e.message,
-      });
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
   }
 };
 
