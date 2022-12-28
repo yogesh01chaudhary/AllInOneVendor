@@ -507,6 +507,212 @@ exports.completeBooking = async (req, res) => {
 };
 
 // @desc see  all booking of an user using userId
+// @route GET vendor/booking/byId/:bookingId
+// @acess Private
+exports.getBookingsById = async (req, res) => {
+  try {
+    const { params } = req;
+    let matchQuery = {
+      $match: { _id: mongoose.Types.ObjectId(params.bookingId) },
+    };
+
+    let data = await Booking.aggregate([
+      {
+        $facet: {
+          totalData: [
+            matchQuery,
+            { $project: { __v: 0 } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: "userData",
+              },
+            },
+            {
+              $lookup: {
+                from: "services",
+                localField: "service",
+                foreignField: "_id",
+                as: "serviceData",
+              },
+            },
+          ],
+          // totalCount: [matchQuery, { $count: "count" }],
+        },
+      },
+    ]);
+
+    let result = data[0].totalData;
+
+    if (result.length === 0) {
+      return res.status(200).send({ success: false, message: "No Data Found" });
+    }
+
+    result = result[0];
+
+    let package;
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].silver._id.toString()
+    ) {
+      package = result.serviceData[0].silver;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].gold._id.toString()
+    ) {
+      package = result.serviceData[0].gold;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].platinum._id.toString()
+    ) {
+      package = result.serviceData[0].platinum;
+    }
+
+    result = {
+      _id: result._id,
+      packageName: package.description,
+      bookingDate: result.timeSlot.bookingDate,
+      time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
+      userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+      address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
+      location: result.userData[0].location.coordinates,
+    };
+
+    return res.status(200).send({
+      success: true,
+      message: "Bookings Fetched Successfully",
+      result,
+    });
+  } catch (e) {
+    return res.status(500).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
+// @desc see  all booking of an user using userId
+// @route GET vendor/booking/bookingId/:bookingId
+// @acess Private
+exports.getBookingsByBookingId = async (req, res) => {
+  try {
+    const { params } = req;
+    let matchQuery = {
+      $match: { _id: mongoose.Types.ObjectId(params.bookingId) },
+    };
+
+    let data = await Booking.aggregate([
+      {
+        $facet: {
+          totalData: [
+            matchQuery,
+            { $project: { __v: 0 } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: "userData",
+              },
+            },
+            {
+              $lookup: {
+                from: "services",
+                localField: "service",
+                foreignField: "_id",
+                as: "serviceData",
+              },
+            },
+          ],
+          // totalCount: [matchQuery, { $count: "count" }],
+        },
+      },
+    ]);
+
+    let result = data[0].totalData;
+
+    if (result.length === 0) {
+      return res.status(200).send({ success: false, message: "No Data Found" });
+    }
+
+    result = result[0];
+
+    let package;
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].silver._id.toString()
+    ) {
+      package = result.serviceData[0].silver;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].gold._id.toString()
+    ) {
+      package = result.serviceData[0].gold;
+    }
+    if (
+      result.item.packageId.toString() ===
+      result.serviceData[0].platinum._id.toString()
+    ) {
+      package = result.serviceData[0].platinum;
+    }
+    var dob = new Date(
+      result.userData[0].dateOfBirth.split("/").reverse().join("/")
+    );
+    var year = dob.getFullYear();
+    var month = dob.getMonth();
+    var day = dob.getDate();
+    var today = new Date();
+    var age = today.getFullYear() - year;
+
+    if (
+      today.getMonth() < month ||
+      (today.getMonth() == month && today.getDate() < day)
+    ) {
+      age--;
+    }
+
+    result = {
+      bookingId: result._id,
+      serviceName: package.description,
+      bookingDate: result.timeSlot.bookingDate,
+      time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
+      userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+      age,
+      mobile: result.userData[0].phone,
+      gender: result.userData[0].gender,
+      bookingStatus: result.bookingStatus,
+      address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
+      location: result.userData[0].location.coordinates,
+      userId: result.userId,
+      service: result.service,
+      packageId: package._id,
+      amountToBePaid: result.total,
+      payby: result.payby,
+      paid: result.paid,
+      paymentStatus: result.paymentStatus,
+    };
+
+    return res.status(200).send({
+      success: true,
+      message: "Bookings Fetched Successfully",
+      result,
+    });
+  } catch (e) {
+    return res.status(500).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
+// @desc see  all booking of an user using userId
 // @route GET vendor/booking
 // @acess Private
 exports.getBookingsVendor = async (req, res) => {
@@ -935,96 +1141,6 @@ exports.getUpcomingBookings = async (req, res) => {
 };
 
 // @desc see  all booking of an user using userId
-// @route GET vendor/booking/:bookingId
-// @acess Private
-exports.getBookingsById = async (req, res) => {
-  try {
-    const { params } = req;
-    let matchQuery = {
-      $match: { _id: mongoose.Types.ObjectId(params.bookingId) },
-    };
-
-    let data = await Booking.aggregate([
-      {
-        $facet: {
-          totalData: [
-            matchQuery,
-            { $project: { __v: 0 } },
-            {
-              $lookup: {
-                from: "users",
-                localField: "userId",
-                foreignField: "_id",
-                as: "userData",
-              },
-            },
-            {
-              $lookup: {
-                from: "services",
-                localField: "service",
-                foreignField: "_id",
-                as: "serviceData",
-              },
-            },
-          ],
-          // totalCount: [matchQuery, { $count: "count" }],
-        },
-      },
-    ]);
-
-    let result = data[0].totalData;
-
-    if (result.length === 0) {
-      return res.status(200).send({ success: false, message: "No Data Found" });
-    }
-
-    result = result[0];
-
-    let package;
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].silver._id.toString()
-    ) {
-      package = result.serviceData[0].silver;
-    }
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].gold._id.toString()
-    ) {
-      package = result.serviceData[0].gold;
-    }
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].platinum._id.toString()
-    ) {
-      package = result.serviceData[0].platinum;
-    }
-
-    result = {
-      _id: result._id,
-      packageName: package.description,
-      bookingDate: result.timeSlot.bookingDate,
-      time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
-      userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
-      address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
-      location: result.userData[0].location.coordinates,
-    };
-
-    return res.status(200).send({
-      success: true,
-      message: "Bookings Fetched Successfully",
-      result,
-    });
-  } catch (e) {
-    return res.status(500).send({
-      success: false,
-      message: "Something went wrong",
-      error: e.message,
-    });
-  }
-};
-
-// @desc see  all booking of an user using userId
 // @route GET vendor/booking/confirmed
 // @acess Private
 exports.getConfirmedBookings = async (req, res) => {
@@ -1070,62 +1186,90 @@ exports.getConfirmedBookings = async (req, res) => {
               },
             },
           ],
-          // totalCount: [matchQuery, { $count: "count" }],
+          totalCount: [matchQuery, { $count: "count" }],
         },
       },
     ]);
 
-    let result = data[0].totalData;
-    // let count = data[0].totalCount;
+    let resultData = data[0].totalData;
+    let count = data[0].totalCount;
 
-    if (result.length === 0) {
+    if (resultData.length === 0) {
       return res.status(200).send({ success: false, message: "No Data Found" });
     }
 
-    result = result[0];
-
     let package;
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].silver._id.toString()
-    ) {
-      package = result.serviceData[0].silver;
-    }
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].gold._id.toString()
-    ) {
-      package = result.serviceData[0].gold;
-    }
-    if (
-      result.item.packageId.toString() ===
-      result.serviceData[0].platinum._id.toString()
-    ) {
-      package = result.serviceData[0].platinum;
-    }
+    let newData = [];
+    for (let result of resultData) {
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].silver._id.toString()
+      ) {
+        package = result.serviceData[0].silver;
+      }
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].gold._id.toString()
+      ) {
+        package = result.serviceData[0].gold;
+      }
+      if (
+        result.item.packageId.toString() ===
+        result.serviceData[0].platinum._id.toString()
+      ) {
+        package = result.serviceData[0].platinum;
+      }
 
-    result = {
-      _id: result._id,
-      // userId: result.userId,
-      service: result.service,
-      item: result.item,
-      package,
-      timeSlot: result.timeSlot,
-      total: result.total,
-      bookingStatus: result.bookingStatus,
-      payby: result.payby,
-      paid: result.paid,
-      paymentStatus: result.paymentStatus,
-      bookingVerificationImage: result.bookingVerificationImage,
-      userData: result.userData[0],
-      userName: `${result.userData[0].firstName}  ${result.userData[0].lastName}`,
-      vendorData: result.vendorData[0],
-    };
+      var dob = new Date(
+        result.userData[0].dateOfBirth.split("/").reverse().join("/")
+      );
+      var year = dob.getFullYear();
+      var month = dob.getMonth();
+      var day = dob.getDate();
+      var today = new Date();
+      var age = today.getFullYear() - year;
+
+      if (
+        today.getMonth() < month ||
+        (today.getMonth() == month && today.getDate() < day)
+      ) {
+        age--;
+      }
+
+      let newResult = {
+        bookingId: result._id,
+        serviceName: package.description,
+        bookingDate: result.timeSlot.bookingDate,
+        time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
+        userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+        age,
+        mobile: result.userData[0].phone,
+        gender: result.userData[0].gender,
+        bookingStatus: result.bookingStatus,
+        address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
+        location: result.userData[0].location.coordinates,
+        userId: result.userId,
+        service: result.service,
+        packageId: package._id,
+        amountToBePaid: result.total,
+        payby: result.payby,
+        paid: result.paid,
+        paymentStatus: result.paymentStatus,
+        // item: result.item,
+        // package,
+        // timeSlot: result.timeSlot,
+        // bookingVerificationImage: result.bookingVerificationImage,
+        // userData: result.userData[0],
+        // vendorData: result.vendorData[0],
+      };
+      newData.push(newResult);
+    }
 
     return res.status(200).send({
       success: true,
       message: "Bookings Fetched Successfully",
-      result,
+      newData,
+      count,
     });
   } catch (e) {
     return res.status(500).send({
@@ -1136,7 +1280,6 @@ exports.getConfirmedBookings = async (req, res) => {
   }
 };
 
-// TESTING
 //@desc admin send booking to nearbyvendors and vendor will transfer the booking and admin will hit api to find nearby vendors and then vendors will confirm/transfer
 //@route PUT vendor/booking/transferCount
 //@access Private
@@ -1358,6 +1501,7 @@ exports.bookingStartTime = async (req, res) => {
   }
 };
 
+// TESTING
 exports.bookingImageUpload = async (req, res) => {
   try {
     // var buf = Buffer.from(
