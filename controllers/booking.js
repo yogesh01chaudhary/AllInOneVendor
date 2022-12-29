@@ -571,15 +571,50 @@ exports.getBookingsById = async (req, res) => {
     ) {
       package = result.serviceData[0].platinum;
     }
+    var dob = new Date(
+      result.userData[0].dateOfBirth.split("/").reverse().join("/")
+    );
+    var year = dob.getFullYear();
+    var month = dob.getMonth();
+    var day = dob.getDate();
+    var today = new Date();
+    var age = today.getFullYear() - year;
+
+    if (
+      today.getMonth() < month ||
+      (today.getMonth() == month && today.getDate() < day)
+    ) {
+      age--;
+    }
+
 
     result = {
-      _id: result._id,
+      // _id: result._id,
+      // packageName: package.description,
+      // bookingDate: result.timeSlot.bookingDate,
+      // time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
+      // userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+      // address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
+      // location: result.userData[0].location.coordinates,
+
+      bookingId: result._id,
       packageName: package.description,
       bookingDate: result.timeSlot.bookingDate,
       time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
       userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
+      age,
+      mobile: result.userData[0].phone,
+      gender: result.userData[0].gender,
+      bookingStatus: result.bookingStatus,
       address: `${result.userData[0].city}, ${result.userData[0].pincode}`,
       location: result.userData[0].location.coordinates,
+      userId: result.userId,
+      service: result.service,
+      packageId: package._id,
+      amountToBePaid: result.total,
+      payby: result.payby,
+      paid: result.paid,
+      paymentStatus: result.paymentStatus,
     };
 
     return res.status(200).send({
