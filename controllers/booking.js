@@ -7,6 +7,12 @@ const TransferCount = require("../models/transferCount");
 const { v4: uuidv4 } = require("uuid");
 const AWS = require("aws-sdk");
 
+const OTP = require("../models/otp");
+var otpGenerator = require("otp-generator");
+const axios = require("axios");
+const fast2sms = require("fast-two-sms");
+const emailValidator = require("deep-email-validator");
+
 //@desc admin send booking to nearbyvendors and vendor will confirm the booking
 //@route PUT vendor/booking/confirmBooking
 //@access Private
@@ -586,7 +592,6 @@ exports.getBookingsById = async (req, res) => {
     ) {
       age--;
     }
-
 
     result = {
       // _id: result._id,
@@ -1567,5 +1572,216 @@ exports.deleteFormDataImage = async (req, res) => {
     });
   } catch (e) {
     res.status(500).send({ success: false, message: e.message });
+  }
+};
+
+// To add minutes to the current time
+function AddMinutesToDate(date, minutes) {
+  return new Date(date.getTime() + minutes * 60 * 1000);
+}
+
+exports.sendOTPToMailAndPhone = async (req, res) => {
+  try {
+    const { body } = req;
+    const { error, value } = Joi.object()
+      .keys({
+        email: Joi.string().lowercase().trim().email().required(),
+        bookingId: Joi.string().required(),
+        phone: Joi.string()
+          .regex(/^[6-9]{1}[0-9]{9}$/)
+          .required(),
+      })
+      .required()
+      .validate(body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    async function isEmailValid(email) {
+      return emailValidator.validate(email);
+    }
+
+    const { valid, reason, validators } = await isEmailValid(value.email);
+
+    if (!valid)
+      return res.status(400).send({
+        message: "Please provide a valid email address.",
+        reason: validators[reason].reason,
+      });
+
+    let email_subject, email_message;
+
+    // Generate OTP
+    const otp = otpGenerator.generate(6, {
+      upperCaseAlphabets: false,
+      specialChars: false,
+      lowerCaseAlphabets: false,
+    });
+    const now = new Date();
+    const expiredAt = AddMinutesToDate(now, 2);
+
+    otp_instance = await OTP.findByIdAndUpdate(
+      { _id: body.bookingId },
+      {
+        email: body.email,
+        phone: body.phone,
+        otp: otp,
+        expiredAt,
+        verified: false,
+      },
+      { new: true, upsert: true }
+    );
+
+    if (!otp_instance) {
+      return res
+        .status(400)
+        .send({ success: false, message: "OTP instance not saved" });
+    }
+    const phoneMessage = require("../templates/sms/phone_verification");
+    let phone_message = phoneMessage(otp);
+    var options = {
+      authorization:
+        "XyzuMWfakTDjJdA1evG3Zncb8xmIP5BiF2LU6OgloESsqpH7YwnB4dpYPb3Hm2gyzclwA8ifZEjL691U",
+      message: phone_message,
+      numbers: [`${body.phone}`],
+    };
+    const response = await fast2sms.sendMessage(options);
+    if (!response.return) {
+      return res
+        .status(500)
+        .send({ success: false, message: "OTP Not Sent", response });
+    }
+
+    const {
+      message,
+      subject_mail,
+    } = require("../templates/email/email_verification");
+    email_message = message(otp);
+    email_subject = subject_mail;
+    let transporter = await nodemailer.createTransport({
+      service: process.env.SERVICE,
+      host: process.env.HOST,
+      port: process.env.PORTMAIL,
+      secure: false,
+      auth: {
+        user: process.env.USER,
+        pass: process.env.PASSWORD,
+      },
+    });
+
+    const mailResponse = await transporter.sendMail({
+      from: `"Yogesh Chaudhary" <${process.env.USER}>`,
+      to: `${body.email}`,
+      subject: email_subject,
+      text: email_message,
+    });
+
+    if (!mailResponse) {
+      return res.status(400).send({
+        success: true,
+        message: "OTP Sent Only TO Number, Something Went Wrong",
+      });
+    }
+    if (mailResponse.accepted.length === 0) {
+      return res.status(400).send({
+        success: false,
+        message: "OTP Sent Only TO Number, Something wrong with email",
+        mailResponse,
+      });
+    }
+    return res.status(200).send({
+      success: true,
+      message: "OTP Sent Successfully To Email And Phone",
+      mailResponse,
+      otp_instance,
+      response,
+    });
+  } catch (err) {
+    const response = { Status: "Failure", Details: err.message };
+    return res.status(400).send(response);
+  }
+};
+
+exports.verifyOTP = async (req, res) => {
+  try {
+    var currentdate = new Date();
+    const { otp, email, bookingId, phone } = req.body;
+
+    const verifySchema = Joi.object()
+      .keys({
+        otp: Joi.number().required(),
+        email: Joi.string().lowercase().trim().email(),
+        bookingId: Joi.string().required(),
+        phone: Joi.string()
+          .regex(/^[6-9]{1}[0-9]{9}$/)
+          .required(),
+      })
+      .required();
+    const { error } = verifySchema.validate(req.body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+
+    let otp_instance = await OTP.aggregate([
+      {
+        $match: {
+          $and: [
+            { _id: mongoose.Types.ObjectId(bookingId) },
+            { $or: [{ email }, { phone }] },
+          ],
+        },
+      },
+    ]);
+    if (!otp_instance) {
+      return res.status(500).send({ success: false, message: "Something went wrong" });
+    }
+    if (otp_instance.length === 0) {
+      return res.status(404).send({ success: false, message: "No Data Found" });
+    }
+    otp_instance = otp_instance[0];
+
+    //Check if OTP is available in the DB
+    if (otp_instance != null) {
+      //Check if OTP is already used or not
+      if (otp_instance.verified != true) {
+        //Check if OTP is expired or not
+        console.log(otp_instance.expiredAt.getTime(), currentdate.getTime());
+        if (otp_instance.expiredAt.getTime() > currentdate.getTime()) {
+          //Check if OTP is equal to the OTP in the DB
+          if (+otp === otp_instance.otp) {
+            await OTP.findByIdAndUpdate(
+              bookingId,
+              { verified: true },
+              { new: true }
+            );
+            const response = {
+              Status: "Success",
+              Details: "OTP Matched",
+              email,
+              phone,
+            };
+            return res.status(200).send(response);
+          } else {
+            const response = { Status: "Failure", Details: "OTP NOT Matched" };
+            return res.status(400).send(response);
+          }
+        } else {
+          const response = { Status: "Failure", Details: "OTP Expired" };
+          return res.status(400).send(response);
+        }
+      } else {
+        const response = { Status: "Failure", Details: "OTP Already Used" };
+        return res.status(400).send(response);
+      }
+    } else {
+      const response = { Status: "Failure", Details: "Bad Request" };
+      return res.status(400).send(response);
+    }
+  } catch (err) {
+    const response = { Status: "Failure", Details: err.message };
+    return res.status(400).send(response);
   }
 };
