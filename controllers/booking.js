@@ -1603,17 +1603,17 @@ exports.sendOTPToMailAndPhone = async (req, res) => {
         .status(400)
         .send({ success: false, message: error.details[0].message });
     }
-    async function isEmailValid(email) {
-      return emailValidator.validate(email);
-    }
+    // async function isEmailValid(email) {
+    //   return emailValidator.validate(email);
+    // }
 
-    const { valid, reason, validators } = await isEmailValid(value.email);
+    // const { valid, reason, validators } = await isEmailValid(value.email);
 
-    if (!valid)
-      return res.status(400).send({
-        message: "Please provide a valid email address.",
-        reason: validators[reason].reason,
-      });
+    // if (!valid)
+    //   return res.status(400).send({
+    //     message: "Please provide a valid email address.",
+    //     reason: validators[reason].reason,
+    //   });
 
     let email_subject, email_message;
 
