@@ -14,6 +14,7 @@ const {
   sendOTPToMail,
   verifyOTP,
   sendOTPToMailAndPhone,
+  checkBookingStatus,
 } = require("../controllers/booking");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -25,6 +26,7 @@ router.put("/confirm", auth, isVendor, confirmBooking);
 router.put("/transfer", auth, isVendor, transferBooking);
 router.put("/transferCount", auth, isVendor, transferCount);
 
+router.get("/checkBookingStatus/:bookingId", auth, isVendor, checkBookingStatus);
 router.get("/byId/:bookingId", auth, isVendor, getBookingsById);
 router.get("/", auth, isVendor, getBookingsVendor);
 router.get("/today", auth, isVendor, getTodayBookings);

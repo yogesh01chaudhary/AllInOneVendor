@@ -584,12 +584,6 @@ exports.bookingStartTime = async (req, res) => {
         .status(404)
         .send({ success: false, message: "Something went wrong" });
     }
-    let date = new Date(Date.now());
-    let hour = date.getHours();
-    let minute = date.getMinutes();
-    let tn = hour >= 12 ? "PM" : "AM";
-    date = `${hour}:${minute} ${tn}`;
-    console.log(date);
     let vendor = await Vendor.findOneAndUpdate(
       {
         _id: mongoose.Types.ObjectId(user.id),
@@ -598,7 +592,7 @@ exports.bookingStartTime = async (req, res) => {
       },
       {
         $set: {
-          "bookings.$[elem].startTime": date,
+          "bookings.$[elem].startTime": Date.now(),
           //   "bookings.$[elem].endTime": Date.now(),
         },
       },
@@ -722,12 +716,6 @@ exports.completeBooking = async (req, res) => {
       { new: true, session }
     );
 
-    let date = new Date(Date.now());
-    let hour = date.getHours();
-    let minute = date.getMinutes();
-    let tn = hour >= 12 ? "PM" : "AM";
-    date = `${hour}:${minute} ${tn}`;
-    console.log(date);
     let vendor = await Vendor.findOneAndUpdate(
       {
         _id: mongoose.Types.ObjectId(user.id),
@@ -737,7 +725,7 @@ exports.completeBooking = async (req, res) => {
       {
         $set: {
           // "bookings.$[elem].startTime": Date.now() + 60 * 60 * 24 * 1000,
-          "bookings.$[elem].endTime": date,
+          "bookings.$[elem].endTime": Date.now(),
         },
         $pull: {
           timeSlot: {
@@ -807,6 +795,71 @@ exports.completeBooking = async (req, res) => {
     await session.commitTransaction();
     await session.endSession();
     return res.status(400).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
+// @desc see  all booking of an user using userId
+// @route GET vendor/booking/checkBookingStatus/:bookingId
+// @acess Private
+exports.checkBookingStatus = async (req, res) => {
+  try {
+    const { params } = req;
+    let matchQuery = {
+      $match: {
+        $and: [
+          { _id: mongoose.Types.ObjectId(params.bookingId) },
+          { vendor: mongoose.Types.ObjectId(user.id) },
+        ],
+      },
+    };
+
+    let data = await Booking.aggregate([
+      {
+        $facet: {
+          totalData: [
+            matchQuery,
+            { $project: { bookingStatus: 1, vendor: 1 } },
+            // {
+            //   $lookup: {
+            //     from: "users",
+            //     localField: "userId",
+            //     foreignField: "_id",
+            //     as: "userData",
+            //   },
+            // },
+            // {
+            //   $lookup: {
+            //     from: "services",
+            //     localField: "service",
+            //     foreignField: "_id",
+            //     as: "serviceData",
+            //   },
+            // },
+          ],
+          // totalCount: [matchQuery, { $count: "count" }],
+        },
+      },
+    ]);
+
+    let result = data[0].totalData;
+
+    if (result.length === 0) {
+      return res.status(200).send({ success: false, message: "No Data Found" });
+    }
+
+    result = result[0];
+
+    return res.status(200).send({
+      success: true,
+      message: "Bookings Fetched Successfully",
+      result,
+    });
+  } catch (e) {
+    return res.status(500).send({
       success: false,
       message: "Something went wrong",
       error: e.message,
