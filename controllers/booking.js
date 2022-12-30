@@ -807,7 +807,7 @@ exports.completeBooking = async (req, res) => {
 // @acess Private
 exports.checkBookingStatus = async (req, res) => {
   try {
-    const { params } = req;
+    const { params,user } = req;
     let matchQuery = {
       $match: {
         $and: [
@@ -848,14 +848,14 @@ exports.checkBookingStatus = async (req, res) => {
     let result = data[0].totalData;
 
     if (result.length === 0) {
-      return res.status(200).send({ success: false, message: "No Data Found" });
+      return res.status(200).send({ success: false, message: "Booking Not Found" });
     }
 
     result = result[0];
 
     return res.status(200).send({
       success: true,
-      message: "Bookings Fetched Successfully",
+      message: "Booking Status Fetched Successfully",
       result,
     });
   } catch (e) {
