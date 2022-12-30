@@ -12,6 +12,7 @@ var otpGenerator = require("otp-generator");
 const axios = require("axios");
 const fast2sms = require("fast-two-sms");
 const emailValidator = require("deep-email-validator");
+const { findById } = require("../models/refreshToken");
 
 //@desc admin send booking to nearbyvendors and vendor will confirm the booking
 //@route PUT vendor/booking/confirmBooking
@@ -359,6 +360,230 @@ exports.transferBooking = async (req, res) => {
   }
 };
 
+//@desc admin send booking to nearbyvendors and vendor will transfer the booking and admin will hit api to find nearby vendors and then vendors will confirm/transfer
+//@route PUT vendor/booking/transferCount
+//@access Private
+exports.transferCount = async (req, res) => {
+  try {
+    const { body, user } = req;
+    //   const { error } = Joi.object()
+    //     .keys({
+    //       bookingId: Joi.string().required(),
+    //     })
+    //     .required()
+    //     .validate(body);
+    //   if (error) {
+    //     return res
+    //       .status(400)
+    //       .send({ success: false, message: error.details[0].message });
+    //   }
+    //   let matchQuery = {
+    //     $match: {
+    //       $and: [
+    //         { _id: mongoose.Types.ObjectId(body.bookingId) },
+    //         { bookingStatus: "Confirmed" },
+    //       ],
+    //     },
+    //   };
+
+    //   let data = await Booking.aggregate([
+    //     {
+    //       $facet: {
+    //         totalData: [
+    //           matchQuery,
+    //           { $project: { __v: 0 } },
+    //           {
+    //             $lookup: {
+    //               from: "users",
+    //               localField: "userId",
+    //               foreignField: "_id",
+    //               as: "userData",
+    //             },
+    //           },
+    //         ],
+    //       },
+    //     },
+    //   ]);
+
+    //   let result = data[0].totalData;
+
+    //   if (result.length === 0) {
+    //     return res
+    //       .status(404)
+    //       .send({ success: false, message: "Booking Not Found" });
+    //   }
+    //   result = result[0];
+
+    let vendor = await Vendor.findById(user.id);
+    if (!vendor) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Vendor Not Found" });
+    }
+    // console.log(vendor.transferCount);
+    if (!vendor.transferCount) {
+      let transferCount = new TransferCount({ vendor: user.id, count: 1 });
+      transferCount = await transferCount.save();
+      if (!transferCount) {
+        return res.status(400).send({
+          success: false,
+          message: "Something went wrong in transfer count ",
+        });
+      }
+      vendor = await Vendor.findByIdAndUpdate(
+        user.id,
+        {
+          transferCount: transferCount._id,
+          $addToSet: { transferredBookings: body.bookingId },
+        },
+        { new: true }
+      );
+      return res.status(200).send({
+        success: true,
+        message: "Transfer",
+        vendor,
+      });
+    }
+    // console.log(vendor.transferCount);
+    let transferCount = await TransferCount.findById(vendor.transferCount);
+    if (!transferCount) {
+      let transferCount = new TransferCount({ vendor: user.id, count: 1 });
+      transferCount = await transferCount.save();
+      if (!transferCount) {
+        return res.status(400).send({
+          success: false,
+          message: "Something went wrong in transfer count ",
+        });
+      }
+      vendor = await Vendor.findByIdAndUpdate(
+        user.id,
+        {
+          transferCount: transferCount._id,
+          $addToSet: { transferredBookings: body.bookingId },
+        },
+        { new: true }
+      );
+      return res.status(200).send({
+        success: true,
+        message: "Transfer",
+        vendor,
+      });
+    }
+    if (transferCount.count !== 3) {
+      vendor = await TransferCount.findByIdAndUpdate(
+        vendor.transferCount,
+        {
+          count: transferCount.count + 1,
+        },
+        { new: true }
+      );
+      return res.status(200).send({
+        success: true,
+        message: "Transfer",
+        vendor,
+      });
+    }
+    return res.status(200).send({
+      success: true,
+      message:
+        "Your Account Is Blocked You Have Reached Maximum Transfer Limit",
+      vendor,
+    });
+  } catch (e) {
+    return res.status(400).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
+exports.bookingStartTime = async (req, res) => {
+  try {
+    const { body, user } = req;
+    const { error } = Joi.object()
+      .keys({
+        bookingId: Joi.string().required(),
+      })
+      .required()
+      .validate(body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
+    let matchQuery = {
+      $match: {
+        $and: [
+          { _id: mongoose.Types.ObjectId(body.bookingId) },
+          // { vendor: mongoose.Types.ObjectId("63a97ab71d8118537d98bedb") },
+          { vendor: mongoose.Types.ObjectId(user.id) },
+          { bookingStatus: "Confirmed" },
+        ],
+      },
+    };
+
+    let data = await Booking.aggregate([
+      {
+        $facet: {
+          totalData: [
+            matchQuery,
+            { $project: { __v: 0 } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: "userData",
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    let result = data[0].totalData;
+
+    if (result.length === 0) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Booking Not Found" });
+    }
+    result = result[0];
+    let vendor = await Vendor.findOneAndUpdate(
+      {
+        _id: mongoose.Types.ObjectId(user.id),
+        // _id: mongoose.Types.ObjectId("63a97ab71d8118537d98bedb"),
+        // bookings: { $all: [{ $elemMatch: { bookingId: body.bookingId } }] },
+      },
+      {
+        $set: {
+          "bookings.$[elem].startTime": Date.now(),
+          //   "bookings.$[elem].endTime": Date.now(),
+        },
+      },
+      {
+        arrayFilters: [
+          { "elem.bookingId": mongoose.Types.ObjectId(body.bookingId) },
+        ],
+        new: true,
+      }
+    );
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Something went wrong" });
+    }
+    return res.status(200).send({ success: true, vendor });
+  } catch (e) {
+    return res.status(500).send({
+      success: false,
+      message: "Something went wrong",
+      error: e.message,
+    });
+  }
+};
+
 //@desc admin send booking to nearbyvendors and vendor will confirm the booking
 //@route PUT vendor/booking/complete
 //@access Private
@@ -385,6 +610,7 @@ exports.completeBooking = async (req, res) => {
           { _id: mongoose.Types.ObjectId(body.bookingId) },
           { bookingStatus: "Confirmed" },
           { vendor: mongoose.Types.ObjectId(user.id) },
+          // { vendor: mongoose.Types.ObjectId("63a97ab71d8118537d98bedb") },
         ],
       },
     };
@@ -430,12 +656,13 @@ exports.completeBooking = async (req, res) => {
     let vendor = await Vendor.findOneAndUpdate(
       {
         _id: mongoose.Types.ObjectId(user.id),
+        // _id: mongoose.Types.ObjectId("63a97ab71d8118537d98bedb"),
         // bookings: { $all: [{ $elemMatch: { bookingId: body.bookingId } }] },
       },
       {
         $set: {
           // "bookings.$[elem].startTime": Date.now() + 60 * 60 * 24 * 1000,
-          "bookings.$[elem].endTime": Date.now(),
+          "bookings.$[elem].endTime": Date.now() + 60 * 60 * 24 * 1000,
         },
         $pull: {
           timeSlot: {
@@ -607,7 +834,7 @@ exports.getBookingsById = async (req, res) => {
       bookingDate: result.timeSlot.bookingDate,
       time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
       userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
-      email:result.userData[0].email,
+      email: result.userData[0].email,
       age,
       mobile: result.userData[0].phone,
       gender: result.userData[0].gender,
@@ -735,7 +962,7 @@ exports.getBookingsVendor = async (req, res) => {
         bookingDate: result.timeSlot.bookingDate,
         time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
         userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
-        email:result.userData[0].email,
+        email: result.userData[0].email,
         age,
         mobile: result.userData[0].phone,
         gender: result.userData[0].gender,
@@ -880,7 +1107,7 @@ exports.getTodayBookings = async (req, res) => {
         bookingDate: result.timeSlot.bookingDate,
         time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
         userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
-        email:result.userData[0].email,
+        email: result.userData[0].email,
         age,
         mobile: result.userData[0].phone,
         gender: result.userData[0].gender,
@@ -1029,7 +1256,7 @@ exports.getUpcomingBookings = async (req, res) => {
         bookingDate: result.timeSlot.bookingDate,
         time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
         userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
-        email:result.userData[0].email,
+        email: result.userData[0].email,
         age,
         mobile: result.userData[0].phone,
         gender: result.userData[0].gender,
@@ -1170,7 +1397,7 @@ exports.getConfirmedBookings = async (req, res) => {
         bookingDate: result.timeSlot.bookingDate,
         time: `${result.timeSlot.start} - ${result.timeSlot.end}`,
         userName: `${result.userData[0].firstName} ${result.userData[0].lastName}`,
-        email:result.userData[0].email,
+        email: result.userData[0].email,
         age,
         mobile: result.userData[0].phone,
         gender: result.userData[0].gender,
@@ -1200,227 +1427,6 @@ exports.getConfirmedBookings = async (req, res) => {
       newData,
       count,
     });
-  } catch (e) {
-    return res.status(500).send({
-      success: false,
-      message: "Something went wrong",
-      error: e.message,
-    });
-  }
-};
-
-//@desc admin send booking to nearbyvendors and vendor will transfer the booking and admin will hit api to find nearby vendors and then vendors will confirm/transfer
-//@route PUT vendor/booking/transferCount
-//@access Private
-exports.transferCount = async (req, res) => {
-  try {
-    const { body, user } = req;
-    //   const { error } = Joi.object()
-    //     .keys({
-    //       bookingId: Joi.string().required(),
-    //     })
-    //     .required()
-    //     .validate(body);
-    //   if (error) {
-    //     return res
-    //       .status(400)
-    //       .send({ success: false, message: error.details[0].message });
-    //   }
-    //   let matchQuery = {
-    //     $match: {
-    //       $and: [
-    //         { _id: mongoose.Types.ObjectId(body.bookingId) },
-    //         { bookingStatus: "Confirmed" },
-    //       ],
-    //     },
-    //   };
-
-    //   let data = await Booking.aggregate([
-    //     {
-    //       $facet: {
-    //         totalData: [
-    //           matchQuery,
-    //           { $project: { __v: 0 } },
-    //           {
-    //             $lookup: {
-    //               from: "users",
-    //               localField: "userId",
-    //               foreignField: "_id",
-    //               as: "userData",
-    //             },
-    //           },
-    //         ],
-    //       },
-    //     },
-    //   ]);
-
-    //   let result = data[0].totalData;
-
-    //   if (result.length === 0) {
-    //     return res
-    //       .status(404)
-    //       .send({ success: false, message: "Booking Not Found" });
-    //   }
-    //   result = result[0];
-
-    let vendor = await Vendor.findById(user.id);
-    if (!vendor) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Vendor Not Found" });
-    }
-    // console.log(vendor.transferCount);
-    if (!vendor.transferCount) {
-      let transferCount = new TransferCount({ vendor: user.id, count: 1 });
-      transferCount = await transferCount.save();
-      if (!transferCount) {
-        return res.status(400).send({
-          success: false,
-          message: "Something went wrong in transfer count ",
-        });
-      }
-      vendor = await Vendor.findByIdAndUpdate(
-        user.id,
-        {
-          transferCount: transferCount._id,
-          $addToSet: { transferredBookings: body.bookingId },
-        },
-        { new: true }
-      );
-      return res.status(200).send({
-        success: true,
-        message: "Transfer",
-        vendor,
-      });
-    }
-    // console.log(vendor.transferCount);
-    let transferCount = await TransferCount.findById(vendor.transferCount);
-    if (!transferCount) {
-      let transferCount = new TransferCount({ vendor: user.id, count: 1 });
-      transferCount = await transferCount.save();
-      if (!transferCount) {
-        return res.status(400).send({
-          success: false,
-          message: "Something went wrong in transfer count ",
-        });
-      }
-      vendor = await Vendor.findByIdAndUpdate(
-        user.id,
-        {
-          transferCount: transferCount._id,
-          $addToSet: { transferredBookings: body.bookingId },
-        },
-        { new: true }
-      );
-      return res.status(200).send({
-        success: true,
-        message: "Transfer",
-        vendor,
-      });
-    }
-    if (transferCount.count !== 3) {
-      vendor = await TransferCount.findByIdAndUpdate(
-        vendor.transferCount,
-        {
-          count: transferCount.count + 1,
-        },
-        { new: true }
-      );
-      return res.status(200).send({
-        success: true,
-        message: "Transfer",
-        vendor,
-      });
-    }
-    return res.status(200).send({
-      success: true,
-      message:
-        "Your Account Is Blocked You Have Reached Maximum Transfer Limit",
-      vendor,
-    });
-  } catch (e) {
-    return res.status(400).send({
-      success: false,
-      message: "Something went wrong",
-      error: e.message,
-    });
-  }
-};
-
-exports.bookingStartTime = async (req, res) => {
-  try {
-    const { body, user } = req;
-    const { error } = Joi.object()
-      .keys({
-        bookingId: Joi.string().required(),
-      })
-      .required()
-      .validate(body);
-    if (error) {
-      return res
-        .status(400)
-        .send({ success: false, message: error.details[0].message });
-    }
-    let matchQuery = {
-      $match: {
-        $and: [
-          { _id: mongoose.Types.ObjectId(body.bookingId) },
-          { bookingStatus: "Confirmed" },
-        ],
-      },
-    };
-
-    let data = await Booking.aggregate([
-      {
-        $facet: {
-          totalData: [
-            matchQuery,
-            { $project: { __v: 0 } },
-            {
-              $lookup: {
-                from: "users",
-                localField: "userId",
-                foreignField: "_id",
-                as: "userData",
-              },
-            },
-          ],
-        },
-      },
-    ]);
-
-    let result = data[0].totalData;
-
-    if (result.length === 0) {
-      return res
-        .status(404)
-        .send({ success: false, message: "Booking Not Found" });
-    }
-    result = result[0];
-    let vendor = await Vendor.findOneAndUpdate(
-      {
-        _id: mongoose.Types.ObjectId(user.id),
-        // bookings: { $all: [{ $elemMatch: { bookingId: body.bookingId } }] },
-      },
-      {
-        $set: {
-          "bookings.$[elem].startTime": Date.now() + 60 * 60 * 24 * 1000,
-          //   "bookings.$[elem].endTime": Date.now(),
-        },
-      },
-      {
-        arrayFilters: [
-          { "elem.bookingId": mongoose.Types.ObjectId(body.bookingId) },
-        ],
-        new: true,
-      }
-    );
-    if (!vendor) {
-      return res
-        .status(404)
-        .send({ success: false, message: "Something went wrong" });
-    }
-    return res.status(200).send({ success: true, vendor });
   } catch (e) {
     return res.status(500).send({
       success: false,
@@ -1617,8 +1623,21 @@ exports.sendOTPToMailAndPhone = async (req, res) => {
 
     let email_subject, email_message;
 
+    let result = await OTP.find({
+      $and: [{ _id: body.bookingId }, { verified: true }],
+    });
+    if (!result) {
+      return res
+        .status(200)
+        .send({ success: false, message: "Something went wrong" });
+    }
+    if (result.length !== 0) {
+      return res
+        .status(200)
+        .send({ success: true, message: "OTP is already verified" });
+    }
     // Generate OTP
-    const otp = otpGenerator.generate(6, {
+    let otp = otpGenerator.generate(6, {
       upperCaseAlphabets: false,
       specialChars: false,
       lowerCaseAlphabets: false,
@@ -1698,9 +1717,9 @@ exports.sendOTPToMailAndPhone = async (req, res) => {
     return res.status(200).send({
       success: true,
       message: "OTP Sent Successfully To Email And Phone",
-      mailResponse,
-      otp_instance,
-      response,
+      // mailResponse,
+      // otp_instance,
+      // response,
     });
   } catch (err) {
     const response = { Status: "Failure", Details: err.message };
@@ -1741,7 +1760,9 @@ exports.verifyOTP = async (req, res) => {
       },
     ]);
     if (!otp_instance) {
-      return res.status(500).send({ success: false, message: "Something went wrong" });
+      return res
+        .status(500)
+        .send({ success: false, message: "Something went wrong" });
     }
     if (otp_instance.length === 0) {
       return res.status(404).send({ success: false, message: "No Data Found" });
