@@ -96,7 +96,7 @@ exports.confirmBooking = async (req, res) => {
         $addToSet: {
           bookings: { bookingId: new mongoose.Types.ObjectId(body.booking) },
         },
-        $push: {
+        $addToSet: {
           timeSlot: {
             start: result.timeSlot.start,
             end: result.timeSlot.end,
@@ -574,7 +574,7 @@ exports.bookingStartTime = async (req, res) => {
         .status(404)
         .send({ success: false, message: "Something went wrong" });
     }
-    return res.status(200).send({ success: true, vendor });
+    return res.status(200).send({ success: true, message: "Booking Started" });
   } catch (e) {
     return res.status(500).send({
       success: false,
@@ -724,9 +724,9 @@ exports.completeBooking = async (req, res) => {
     return res.status(200).send({
       success: true,
       message: "Booking Completed",
-      booking,
-      vendor,
-      mailResponse,
+      // booking,
+      // vendor,
+      // mailResponse,
     });
   } catch (e) {
     await session.commitTransaction();
