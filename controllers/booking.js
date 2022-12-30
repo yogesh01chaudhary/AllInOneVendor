@@ -499,7 +499,9 @@ exports.transferCount = async (req, res) => {
 };
 
 exports.bookingStartTime = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
+    session.startTransaction();
     const { body, user } = req;
     const { error } = Joi.object()
       .keys({
@@ -545,11 +547,48 @@ exports.bookingStartTime = async (req, res) => {
     let result = data[0].totalData;
 
     if (result.length === 0) {
+      let booking = await Booking.find({
+        $and: [
+          { _id: mongoose.Types.ObjectId(body.bookingId) },
+          // { vendor: mongoose.Types.ObjectId("63a97ab71d8118537d98bedb") },
+          { vendor: mongoose.Types.ObjectId(user.id) },
+          { bookingStatus: "Started" },
+        ],
+      });
+      if (!booking) {
+        return res
+          .status(500)
+          .send({ success: false, message: "Something went wrong" });
+      }
+      if (booking.length !== 0) {
+        return res
+          .status(200)
+          .send({ success: false, message: "Booking Already Started" });
+      }
       return res
         .status(404)
         .send({ success: false, message: "Booking Not Found" });
     }
     result = result[0];
+    let booking = await Booking.findByIdAndUpdate(
+      body.bookingId,
+      {
+        bookingStatus: "Started",
+      },
+      { new: true, session }
+    );
+    if (!booking) {
+      await session.abortTransaction();
+      await session.endSession();
+      return res
+        .status(404)
+        .send({ success: false, message: "Something went wrong" });
+    }
+    let date = new Date(Date.now());
+    let hour = date.getHours();
+    let minute = date.getMinutes();
+    let tn = hour >= 12 ? PM : AM;
+    date = `${hour}:${minute} ${tn}`;
     let vendor = await Vendor.findOneAndUpdate(
       {
         _id: mongoose.Types.ObjectId(user.id),
@@ -558,7 +597,7 @@ exports.bookingStartTime = async (req, res) => {
       },
       {
         $set: {
-          "bookings.$[elem].startTime": Date.now(),
+          "bookings.$[elem].startTime": date,
           //   "bookings.$[elem].endTime": Date.now(),
         },
       },
@@ -567,15 +606,23 @@ exports.bookingStartTime = async (req, res) => {
           { "elem.bookingId": mongoose.Types.ObjectId(body.bookingId) },
         ],
         new: true,
+        session,
       }
     );
     if (!vendor) {
+      await session.abortTransaction();
+      await session.endSession();
       return res
         .status(404)
         .send({ success: false, message: "Something went wrong" });
     }
+
+    await session.commitTransaction();
+    await session.endSession();
     return res.status(200).send({ success: true, message: "Booking Started" });
   } catch (e) {
+    await session.abortTransaction();
+    await session.endSession();
     return res.status(500).send({
       success: false,
       message: "Something went wrong",
@@ -608,7 +655,7 @@ exports.completeBooking = async (req, res) => {
       $match: {
         $and: [
           { _id: mongoose.Types.ObjectId(body.bookingId) },
-          { bookingStatus: "Confirmed" },
+          { bookingStatus: "Started" },
           { vendor: mongoose.Types.ObjectId(user.id) },
           // { vendor: mongoose.Types.ObjectId("63a97ab71d8118537d98bedb") },
         ],
@@ -637,7 +684,27 @@ exports.completeBooking = async (req, res) => {
     let result = data[0].totalData;
 
     if (result.length === 0) {
-      return res.status(404).send({ success: false, message: "No Data Found" });
+      let booking = await Booking.find({
+        $and: [
+          { _id: mongoose.Types.ObjectId(body.bookingId) },
+          // { vendor: mongoose.Types.ObjectId("63a97ab71d8118537d98bedb") },
+          { vendor: mongoose.Types.ObjectId(user.id) },
+          { bookingStatus: "Completed" },
+        ],
+      });
+      if (!booking) {
+        return res
+          .status(500)
+          .send({ success: false, message: "Something went wrong" });
+      }
+      if (booking.length !== 0) {
+        return res
+          .status(200)
+          .send({ success: false, message: "Booking Already Completed" });
+      }
+      return res
+        .status(404)
+        .send({ success: false, message: "Booking Not Found" });
     }
     result = result[0];
     if (!result.userData[0].email && !result.userData[0].phone) {
@@ -646,13 +713,19 @@ exports.completeBooking = async (req, res) => {
         .send({ success: false, mesage: "User Mail Id Or Phone Is Required" });
     }
 
-    let booking = await Booking.findByIdAndUpdate(
+    await Booking.findByIdAndUpdate(
       body.bookingId,
       {
         bookingStatus: "Completed",
       },
       { new: true, session }
     );
+
+    let date = new Date(Date.now());
+    let hour = date.getHours();
+    let minute = date.getMinutes();
+    let tn = hour >= 12 ? PM : AM;
+    date = `${hour}:${minute} ${tn}`;
     let vendor = await Vendor.findOneAndUpdate(
       {
         _id: mongoose.Types.ObjectId(user.id),
@@ -662,7 +735,7 @@ exports.completeBooking = async (req, res) => {
       {
         $set: {
           // "bookings.$[elem].startTime": Date.now() + 60 * 60 * 24 * 1000,
-          "bookings.$[elem].endTime": Date.now() + 60 * 60 * 24 * 1000,
+          "bookings.$[elem].endTime": date,
         },
         $pull: {
           timeSlot: {
