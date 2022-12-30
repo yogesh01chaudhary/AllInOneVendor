@@ -724,8 +724,9 @@ exports.completeBooking = async (req, res) => {
     let date = new Date(Date.now());
     let hour = date.getHours();
     let minute = date.getMinutes();
-    let tn = hour >= 12 ? PM : AM;
+    let tn = hour >= 12 ? "PM" : "AM";
     date = `${hour}:${minute} ${tn}`;
+    console.log(date)
     let vendor = await Vendor.findOneAndUpdate(
       {
         _id: mongoose.Types.ObjectId(user.id),
