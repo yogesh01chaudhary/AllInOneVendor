@@ -15,6 +15,8 @@ const {
   verifyOTP,
   sendOTPToMailAndPhone,
   checkBookingStatus,
+  uploadBookingImage,
+  deleteBookingImage,
 } = require("../controllers/booking");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -39,5 +41,7 @@ router.put("/bookingStartTime", auth, isVendor, bookingStartTime);
 router.put("/complete", auth, isVendor, completeBooking);
 
 router.put("/bookingImageUpload", auth, isVendor, bookingImageUpload);
+router.put("/uploadBookingImage", auth, isVendor, uploadBookingImage);
+router.delete("/deleteBookingImage", auth, isVendor, deleteBookingImage);
 
 module.exports = router;

@@ -807,7 +807,7 @@ exports.completeBooking = async (req, res) => {
 // @acess Private
 exports.checkBookingStatus = async (req, res) => {
   try {
-    const { params,user } = req;
+    const { params, user } = req;
     let matchQuery = {
       $match: {
         $and: [
@@ -848,7 +848,9 @@ exports.checkBookingStatus = async (req, res) => {
     let result = data[0].totalData;
 
     if (result.length === 0) {
-      return res.status(200).send({ success: false, message: "Booking Not Found" });
+      return res
+        .status(200)
+        .send({ success: false, message: "Booking Not Found" });
     }
 
     result = result[0];
@@ -1662,53 +1664,278 @@ exports.bookingImageUpload = async (req, res) => {
   }
 };
 
-exports.deleteFormDataImage = async (req, res) => {
+exports.uploadBookingImage = async (req, res) => {
   try {
+    const { bookingId, uploadFor } = req.body;
+    const { error } = Joi.object()
+      .keys({
+        image: Joi.string(),
+        uploadFor: Joi.string().required(),
+        bookingId: Joi.string().required(),
+      })
+      .required()
+      .validate(req.body);
+    if (error) {
+      return res
+        .status(400)
+        .send({ success: false, message: error.details[0].message });
+    }
     const { id } = req.user;
     const s3 = new AWS.S3({
       accessKeyId: process.env.AWS_ID,
       secretAccessKey: process.env.AWS_SECRET,
     });
 
-    let fileName = req.body.imageUrl.split("/");
+    var image;
+    if (!req.files && !req.body.image) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Please upload the file" });
+    }
+
+    if (req.files) {
+      if (req.files.image.length > 1) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Can Upload Only 1 image" });
+      }
+      if (!req.files.image.mimetype.startsWith("image")) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Please provide valid image" });
+      }
+      image = req.files.image.data;
+    }
+
+    if (req.body.image) {
+      image = Buffer.from(
+        req.body.image.replace(/^data:image\/\w+;base64,/, ""),
+        "base64"
+      );
+    }
+
+    const uploadToS3 = async (uploadType, booking) => {
+      let check = uploadType.split(".");
+      console.log(check);
+      let found;
+      console.log(booking.bookingVerificationImage);
+      if (uploadType == "maskSelfie") {
+        found = booking.bookingVerificationImage.maskSelfie;
+        console.log(found);
+      }
+      if (uploadType == "productImage") {
+        found = booking.bookingVerificationImage.productImage;
+      }
+      if (found) {
+        console.log(found);
+        let key = found.split("/");
+        key = key[key.length - 2] + "/" + key[key.length - 1];
+        const params = {
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: key,
+          Body: image,
+          ContentEncoding: "base64",
+          ContentType: `image/jpeg`,
+        };
+        s3.upload(params, async (error, data) => {
+          if (error) {
+            return res.status(500).send(error.message);
+          } else {
+            const booking = await Booking.findByIdAndUpdate(
+              bookingId,
+              {
+                [`bookingVerificationImage${uploadType}`]: data.Location,
+              },
+              { new: true }
+            );
+
+            if (booking) {
+              if (
+                booking.bookingVerificationImage.maskSelfie &&
+                booking.bookingVerificationImage.maskSelfie !== "" &&
+                booking.bookingVerificationImage.productImage &&
+                booking.bookingVerificationImage.productImage !== ""
+              ) {
+                await Booking.findByIdAndUpdate(
+                  {
+                    _id: bookingId,
+                  },
+                  { bookingStatus: "ImageUploaded" }
+                );
+              }
+              return res.status(200).send({
+                status: true,
+                message: `Image Updated Successfully For  ${uploadType}`,
+                bookingVerificationImage: booking.bookingVerificationImage,
+              });
+            } else {
+              return res.status(400).send({
+                status: false,
+                message: "Image Not Updated",
+              });
+            }
+          }
+        });
+      } else {
+        const params = {
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: `${id}/${uuidv4()}.jpeg`,
+          Body: image,
+          ContentEncoding: "base64",
+          ContentType: `image/jpeg`,
+        };
+        s3.upload(params, async (error, data) => {
+          if (error) {
+            return res.status(500).send(error.message);
+          } else {
+            const booking = await Booking.findByIdAndUpdate(
+              bookingId,
+              {
+                [`bookingVerificationImage.${uploadType}`]: data.Location,
+              },
+              { new: true }
+            );
+            if (booking) {
+              if (
+                booking.bookingVerificationImage.maskSelfie &&
+                booking.bookingVerificationImage.maskSelfie !== "" &&
+                booking.bookingVerificationImage.productImage &&
+                booking.bookingVerificationImage.productImage !== ""
+              ) {
+                await Booking.findByIdAndUpdate(
+                  {
+                    _id: bookingId,
+                  },
+                  { bookingStatus: "ImageUploaded" }
+                );
+              }
+
+              return res.status(200).send({
+                status: true,
+                message: `Image Uploaded Successfully For ${uploadType}`,
+                bookingVerificationImage: booking.bookingVerificationImage,
+              });
+            } else {
+              return res.status(400).send({
+                status: false,
+                message: "Image Not uploaded",
+              });
+            }
+          }
+        });
+      }
+    };
+
+    let booking = await Booking.find({
+      $and: [
+        { _id: bookingId },
+        { vendor: id },
+        { bookingStatus: ["Started", "ImageUploaded"] },
+      ],
+    });
+    // console.log(booking);
+    if (!booking) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Something went wrong" });
+    }
+    if (booking.length == 0) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Booking Doesn't Exists" });
+    }
+    console.log(req.body);
+    if (uploadFor === "maskSelfie") {
+      uploadToS3(uploadFor, booking[0]);
+    } else if (uploadFor === "productImage") {
+      uploadToS3(uploadFor, booking[0]);
+    } else {
+      return res.status(400).send({
+        success: false,
+        message: "Please provide valid type to upload image",
+      });
+    }
+  } catch (error) {
+    return res.status(500).send({
+      status: false,
+      message: error.toString(),
+    });
+  }
+};
+
+exports.deleteBookingImage = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const { bookingId } = req.body;
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+
+    let fileName = req.body.url.split("/");
     fileName =
       fileName[fileName.length - 2] + "/" + fileName[fileName.length - 1];
     const key = `${fileName}`;
     var params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
-    let booking = await booking.findById(id);
 
+    const deleteFromS3 = async (type, booking) => {
+      let check = type.split(".");
+      let found;
+      if (check.length == 1) {
+        found = booking.bookingVerificationImage[`${check[0]}`];
+      }
+      if (check.length == 2) {
+        found = booking[`${check[0]}`][`${check[1]}`];
+      }
+      if (found !== req.body.url) {
+        return res.status(400).send({
+          success: false,
+          message: "Can't be deleted Url doesn't match with Booking's Url",
+        });
+      }
+
+      s3.deleteObject(params, async (err) => {
+        if (err)
+          return res.status(500).send({
+            success: false,
+            message: "Something went wrong",
+            error: err.message,
+          });
+        let booking = await Booking.findByIdAndUpdate(
+          bookingId,
+          { [`bookingVerificationImage.${type}`]: "" },
+          { new: true }
+        );
+
+        if (
+          booking.bookingVerificationImage.maskSelfie === "" &&
+          booking.bookingVerificationImage.productImage === ""
+        ) {
+          booking.bookingStatus = "Confirmed";
+          booking.save();
+        }
+        return res.status(200).send({
+          success: true,
+          message: "Successfully Deleted",
+        });
+      });
+    };
+    let booking = await Booking.findById(bookingId);
     if (!booking) {
       return res
         .status(404)
-        .send({ success: false, message: "booking Doesn't Exists" });
+        .send({ success: false, message: "Booking Doesn't Exists" });
     }
-
-    if (booking.imageUrl !== req.body.imageUrl) {
+    if (req.body.type === "maskSelfie") {
+      deleteFromS3(req.body.type, booking);
+    } else if (req.body.type === "productImage") {
+      deleteFromS3(req.body.type, booking);
+    } else {
       return res.status(400).send({
         success: false,
-        message:
-          "Can't be deleted imageUrl doesn't match with booking's imageUrl",
+        message: "Please provide valid type to delete image",
       });
     }
-
-    s3.deleteObject(params, async (err) => {
-      if (err)
-        return res.status(500).send({
-          success: false,
-          message: "Something went wrong",
-          error: err.message,
-        });
-      let booking = await booking.findByIdAndUpdate(
-        id,
-        { imageUrl: "" },
-        { new: true }
-      );
-      return res.status(200).send({
-        success: true,
-        message: "Successfully Deleted",
-        imageUrl: booking.imageUrl,
-      });
-    });
   } catch (e) {
     res.status(500).send({ success: false, message: e.message });
   }
