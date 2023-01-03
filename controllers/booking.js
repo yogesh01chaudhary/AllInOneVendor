@@ -1956,6 +1956,7 @@ exports.sendOTPToMailAndPhone = async (req, res) => {
         phone: Joi.string()
           .regex(/^[6-9]{1}[0-9]{9}$/)
           .required(),
+        otpType: Joi.string().required(),
       })
       .required()
       .validate(body);
@@ -1978,18 +1979,20 @@ exports.sendOTPToMailAndPhone = async (req, res) => {
 
     let email_subject, email_message;
 
-    let result = await OTP.find({
-      $and: [{ _id: body.bookingId }, { verified: true }],
-    });
-    if (!result) {
-      return res
-        .status(200)
-        .send({ success: false, message: "Something went wrong" });
-    }
-    if (result.length !== 0) {
-      return res
-        .status(200)
-        .send({ success: true, message: "OTP is already verified" });
+    if (body.otpType == "start") {
+      let result = await OTP.find({
+        $and: [{ _id: body.bookingId }, { verified: true }],
+      });
+      if (!result) {
+        return res
+          .status(200)
+          .send({ success: false, message: "Something went wrong" });
+      }
+      if (result.length !== 0) {
+        return res
+          .status(200)
+          .send({ success: true, message: "OTP is already verified" });
+      }
     }
     // Generate OTP
     let otp = otpGenerator.generate(6, {
