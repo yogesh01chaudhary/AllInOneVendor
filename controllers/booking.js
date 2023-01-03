@@ -650,7 +650,7 @@ exports.completeBooking = async (req, res) => {
       $match: {
         $and: [
           { _id: mongoose.Types.ObjectId(body.bookingId) },
-          { bookingStatus: "Started" },
+          { bookingStatus: "ImageUploaded" },
           { vendor: mongoose.Types.ObjectId(user.id) },
           // { vendor: mongoose.Types.ObjectId("63a97ab71d8118537d98bedb") },
         ],
