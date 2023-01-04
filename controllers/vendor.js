@@ -408,17 +408,26 @@ exports.getMyProfile = async (req, res) => {
     if (myProfile) {
       let result = {
         UID: myProfile._id,
-        name: `${myProfile.firstName} ${myProfile.lastName}`,
+        // name: `${myProfile.firstName} ${myProfile.lastName}`,
+        firstName: myProfile.firstName,
+        lastName: myProfile.lastName,
         DOB: myProfile.DOB,
         email: myProfile.email,
         mobileNumber: myProfile.mobileNumber,
+        alternateNumber: myProfile.alternateNumber,
+        emergencyNumber: myProfile.emergencyNumber,
+        workExperence: myProfile.workExperience,
         city: myProfile.currentAddress.city,
         imageUrl: myProfile.imageUrl,
+        deviceToken: myProfile.deviceToken,
+        permanentAddress: myProfile.permanentAddress,
+        currentAddress: myProfile.currentAddress,
       };
       return res.status(200).json({
         success: true,
         message: "Profile Fetched Successfully",
         result,
+        // myProfile,
       });
     }
     return res
