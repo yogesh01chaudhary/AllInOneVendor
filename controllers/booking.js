@@ -37,12 +37,7 @@ exports.confirmBooking = async (req, res) => {
       $match: {
         $and: [
           { _id: mongoose.Types.ObjectId(body.booking) },
-          {
-            $or: [
-              { bookingStatus: "Pending" },
-              { bookingStatus: "Transferred" },
-            ],
-          },
+          { bookingStatus: "Pending" },
         ],
       },
     };
@@ -95,8 +90,6 @@ exports.confirmBooking = async (req, res) => {
       {
         $addToSet: {
           bookings: { bookingId: new mongoose.Types.ObjectId(body.booking) },
-        },
-        $addToSet: {
           timeSlot: {
             start: result.timeSlot.start,
             end: result.timeSlot.end,
@@ -187,12 +180,7 @@ exports.transferBooking = async (req, res) => {
       $match: {
         $and: [
           { _id: mongoose.Types.ObjectId(body.bookingId) },
-          {
-            $or: [
-              { bookingStatus: "Pending" },
-              { bookingStatus: "Transferred" },
-            ],
-          },
+          { bookingStatus: "Pending" },
         ],
       },
     };
@@ -250,13 +238,13 @@ exports.transferBooking = async (req, res) => {
         },
         { new: true, session }
       );
-      await Booking.findByIdAndUpdate(
-        body.bookingId,
-        {
-          bookingStatus: "Transferred",
-        },
-        { new: true, session }
-      );
+      // await Booking.findByIdAndUpdate(
+      //   body.bookingId,
+      //   {
+      //     bookingStatus: "Transferred",
+      //   },
+      //   { new: true, session }
+      // );
 
       await session.commitTransaction();
       await session.endSession();
@@ -286,13 +274,13 @@ exports.transferBooking = async (req, res) => {
         },
         { new: true, session }
       );
-      await Booking.findByIdAndUpdate(
-        body.bookingId,
-        {
-          bookingStatus: "Transferred",
-        },
-        { new: true, session }
-      );
+      // await Booking.findByIdAndUpdate(
+      //   body.bookingId,
+      //   {
+      //     bookingStatus: "Transferred",
+      //   },
+      //   { new: true, session }
+      // );
 
       await session.commitTransaction();
       await session.endSession();
@@ -320,13 +308,13 @@ exports.transferBooking = async (req, res) => {
         },
         { new: true, session }
       );
-      await Booking.findByIdAndUpdate(
-        body.bookingId,
-        {
-          bookingStatus: "Transferred",
-        },
-        { new: true, session }
-      );
+      // await Booking.findByIdAndUpdate(
+      //   body.bookingId,
+      //   {
+      //     bookingStatus: "Transferred",
+      //   },
+      //   { new: true, session }
+      // );
 
       await session.commitTransaction();
       await session.endSession();
@@ -570,10 +558,12 @@ exports.bookingStartTime = async (req, res) => {
         .send({ success: false, message: "Booking Not Found" });
     }
     result = result[0];
+    let time = Date.now();
     let booking = await Booking.findByIdAndUpdate(
       body.bookingId,
       {
         bookingStatus: "Started",
+        startTime: time,
       },
       { new: true, session }
     );
@@ -592,7 +582,7 @@ exports.bookingStartTime = async (req, res) => {
       },
       {
         $set: {
-          "bookings.$[elem].startTime": Date.now(),
+          "bookings.$[elem].startTime": time,
           //   "bookings.$[elem].endTime": Date.now(),
         },
       },
@@ -707,11 +697,12 @@ exports.completeBooking = async (req, res) => {
         .status(400)
         .send({ success: false, mesage: "User Mail Id Or Phone Is Required" });
     }
-
+    let time = Date.now();
     await Booking.findByIdAndUpdate(
       body.bookingId,
       {
         bookingStatus: "Completed",
+        endTime: time,
       },
       { new: true, session }
     );
@@ -725,7 +716,7 @@ exports.completeBooking = async (req, res) => {
       {
         $set: {
           // "bookings.$[elem].startTime": Date.now() + 60 * 60 * 24 * 1000,
-          "bookings.$[elem].endTime": Date.now(),
+          "bookings.$[elem].endTime": time,
         },
         $pull: {
           timeSlot: {
