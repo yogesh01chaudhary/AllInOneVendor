@@ -1,5 +1,5 @@
 const { Schema, model } = require("mongoose");
-const NearByVendorsSchema = new Schema([
+var NearSchema = new Schema(
   {
     vendor: {
       type: Schema.Types.ObjectId,
@@ -8,8 +8,13 @@ const NearByVendorsSchema = new Schema([
     },
     action: {
       type: String,
-      enum: ["Confirm", "Transfer"],
+      enum: ["Confirm", "Transfer", "Pending"],
+      default: "Pending",
     },
   },
-]);
+  { _id: false }
+);
+const NearByVendorsSchema = new Schema({
+  vendors: [NearSchema],
+});
 module.exports = model("nearByVendors", NearByVendorsSchema);

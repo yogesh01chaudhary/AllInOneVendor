@@ -13,6 +13,7 @@ const axios = require("axios");
 const fast2sms = require("fast-two-sms");
 const emailValidator = require("deep-email-validator");
 const { findById } = require("../models/refreshToken");
+const NearByVendors = require("../models/nearByVendors");
 
 //@desc admin send booking to nearbyvendors and vendor will confirm the booking
 //@route PUT vendor/booking/confirmBooking
@@ -100,10 +101,37 @@ exports.confirmBooking = async (req, res) => {
       },
       { new: true, session }
     );
+
     if (!vendor) {
       return res
         .status(400)
         .send({ success: false, message: "Something went wrong" });
+    }
+    console.log(user.id);
+    let nearBy = await NearByVendors.findOneAndUpdate(
+      { $and: [{ _id: body.booking }, { "vendors.vendor": user.id }] },
+
+      {
+        $set: {
+          "vendors.$[elem].action": "Confirm",
+        },
+      },
+      {
+        arrayFilters: [{ "elem.vendor": mongoose.Types.ObjectId(user.id) }],
+        new: true,
+        session,
+      }
+    );
+    console.log(nearBy);
+    if (!nearBy) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Something went wrong nearBy" });
+    }
+    if (nearBy.length === 0) {
+      return res
+        .status(400)
+        .send({ success: false, message: "NearByNot Updated" });
     }
 
     // send mail or sms to user to let him know that his booking is confirmed
@@ -165,6 +193,8 @@ exports.transferBooking = async (req, res) => {
   const session = await mongoose.startSession();
   try {
     const { body, user } = req;
+
+    console.log(body.bookingId, user.id);
     const { error } = Joi.object()
       .keys({
         bookingId: Joi.string().required(),
@@ -245,7 +275,31 @@ exports.transferBooking = async (req, res) => {
       //   },
       //   { new: true, session }
       // );
+      let nearBy = await NearByVendors.findOneAndUpdate(
+        { $and: [{ _id: body.bookingId }, { "vendors.vendor": user.id }] },
 
+        {
+          $set: {
+            "vendors.$[elem].action": "Transfer",
+          },
+        },
+        {
+          arrayFilters: [{ "elem.vendor": mongoose.Types.ObjectId(user.id) }],
+          new: true,
+          session,
+        }
+      );
+      console.log(nearBy);
+      if (!nearBy) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Something went wrong nearBy" });
+      }
+      if (nearBy.length === 0) {
+        return res
+          .status(400)
+          .send({ success: false, message: "No Data For nearBy" });
+      }
       await session.commitTransaction();
       await session.endSession();
       return res.status(200).send({
@@ -281,6 +335,31 @@ exports.transferBooking = async (req, res) => {
       //   },
       //   { new: true, session }
       // );
+      let nearBy = await NearByVendors.findOneAndUpdate(
+        { $and: [{ _id: body.bookingId }, { "vendors.vendor": user.id }] },
+
+        {
+          $set: {
+            "vendors.$[elem].action": "Transfer",
+          },
+        },
+        {
+          arrayFilters: [{ "elem.vendor": mongoose.Types.ObjectId(user.id) }],
+          new: true,
+          session,
+        }
+      );
+      console.log(nearBy);
+      if (!nearBy) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Something went wrong nearBy" });
+      }
+      if (nearBy.length === 0) {
+        return res
+          .status(400)
+          .send({ success: false, message: "No Data For nearBy" });
+      }
 
       await session.commitTransaction();
       await session.endSession();
@@ -315,6 +394,30 @@ exports.transferBooking = async (req, res) => {
       //   },
       //   { new: true, session }
       // );
+      let nearBy = await NearByVendors.findOneAndUpdate(
+        { $and: [{ _id: body.bookingId }, { "vendors.vendor": user.id }] },
+        {
+          $set: {
+            "vendors.$[elem].action": "Transfer",
+          },
+        },
+        {
+          arrayFilters: [{ "elem.vendor": mongoose.Types.ObjectId(user.id) }],
+          new: true,
+          session,
+        }
+      );
+      console.log(nearBy);
+      if (!nearBy) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Something went wrong nearBy" });
+      }
+      if (nearBy.length === 0) {
+        return res
+          .status(400)
+          .send({ success: false, message: "No Data For nearBy" });
+      }
 
       await session.commitTransaction();
       await session.endSession();

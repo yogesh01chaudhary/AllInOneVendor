@@ -422,6 +422,7 @@ exports.getMyProfile = async (req, res) => {
         deviceToken: myProfile.deviceToken,
         permanentAddress: myProfile.permanentAddress,
         currentAddress: myProfile.currentAddress,
+        gender:myProfile.gender
       };
       return res.status(200).json({
         success: true,
