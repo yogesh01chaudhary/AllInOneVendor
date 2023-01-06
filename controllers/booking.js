@@ -15,6 +15,7 @@ const emailValidator = require("deep-email-validator");
 const { findById } = require("../models/refreshToken");
 const NearByVendors = require("../models/nearByVendors");
 
+//******************************************bookingConfirmAndTransfer****************************************************************************** */
 //@desc admin send booking to nearbyvendors and vendor will confirm the booking
 //@route PUT vendor/booking/confirmBooking
 //@access Private
@@ -73,6 +74,119 @@ exports.confirmBooking = async (req, res) => {
         .send({ success: false, mesage: "User Mail Id Or Phone Is Required" });
     }
 
+    const getVendors = async (vendorId) => {
+      let vendor = await Vendor.findById({ _id: vendorId });
+      if (!vendor) {
+        return res
+          .status(404)
+          .send({ success: false, message: "No Vendor Found" });
+      }
+      // console.log(vendor.transferCount, mainVendors, mainVendors[vendorId]);
+      if (vendor.transferCount) {
+        let vendorCount = await TransferCount.findOne({
+          _id: vendor.transferCount,
+          vendor: vendorId,
+        });
+        // console.log("vendorCount", vendorCount);
+        if (vendorCount && vendorCount.count == 3) {
+          // console.log("before", mainVendors);
+          return res.status(500).send({
+            success: false,
+            message:
+              "Your account is blocked you exceeded maximum transferCount so booking can not be confirmed",
+          });
+          // console.log("after", mainVendors);
+        }
+      }
+
+      // console.log("onLeave", vendor.onLeave, mainVendors[vendorId]);
+      if (vendor.onLeave.length > 0) {
+        let vendorOnLeave = await Vendor.find({
+          _id: vendorId,
+          onLeave: {
+            $all: [
+              {
+                $elemMatch: {
+                  $and: [
+                    { start: { $gte: result.timeSlot.bookingDate } },
+                    { end: { $lte: result.timeSlot.bookingDate } },
+                    { status: { $eq: "Approved" } },
+                  ],
+                },
+              },
+            ],
+          },
+        });
+        // console.log("vendorOnLeave", vendorOnLeave);
+        if (vendorOnLeave.length > 0) {
+          return res.status(500).send({
+            success: false,
+            message: "You are on leave",
+          });
+          // console.log("mainVendorsLeave", mainVendors);
+        }
+      }
+
+      // console.log("emergencyLeave", vendor.emergencyLeave);
+      if (vendor.emergencyLeave.length > 0) {
+        let vendorEmergencyLeave = await Vendor.find({
+          _id: vendorId,
+          emergencyLeave: {
+            $all: [
+              {
+                $elemMatch: {
+                  $and: [
+                    { date: { $eq: result.timeSlot.bookingDate } },
+                    { status: { $eq: "Approved" } },
+                  ],
+                },
+              },
+            ],
+          },
+        });
+        // console.log("vendorEmergencyLeave", vendorEmergencyLeave);
+        if (vendorEmergencyLeave.length > 0) {
+          return res.status(500).send({
+            success: false,
+            message: "You are on emergencyLeave",
+          });
+          // console.log(mainVendors);
+        }
+      }
+
+      // console.log("timeSlot", vendor.timeSlot, mainVendors[vendorId]);
+      if (vendor.timeSlot.length > 0) {
+        let vendorTimeSlot = await Vendor.find({
+          _id: vendorId,
+          timeSlot: {
+            $all: [
+              {
+                $elemMatch: {
+                  $and: [
+                    { start: { $eq: result.timeSlot.start } },
+                    { end: { $eq: result.timeSlot.end } },
+                    {
+                      bookingDate: { $eq: result.timeSlot.bookingDate },
+                    },
+                    { booked: true },
+                  ],
+                },
+              },
+            ],
+          },
+        });
+        // console.log("vendorTimeSlot", vendorTimeSlot);
+        if (vendorTimeSlot.length > 0) {
+          return res.status(500).send({
+            success: false,
+            message: "You are already booked at this time",
+          });
+          // console.log("mainVendors TimeSlot", mainVendors);
+        }
+      }
+    };
+    await getVendors(user._id);
+
     let booking = await Booking.findByIdAndUpdate(
       body.booking,
       {
@@ -107,7 +221,7 @@ exports.confirmBooking = async (req, res) => {
         .status(400)
         .send({ success: false, message: "Something went wrong" });
     }
-    console.log(user.id);
+    // console.log(user.id);
     let nearBy = await NearByVendors.findOneAndUpdate(
       { $and: [{ _id: body.booking }, { "vendors.vendor": user.id }] },
 
@@ -122,7 +236,7 @@ exports.confirmBooking = async (req, res) => {
         session,
       }
     );
-    console.log(nearBy);
+    // console.log(nearBy);
     if (!nearBy) {
       return res
         .status(400)
@@ -589,6 +703,10 @@ exports.transferCount = async (req, res) => {
   }
 };
 
+//******************************************bookingStartAndComplete****************************************************************************** */
+//@desc vendor will note the startTime of a booking
+//@route PUT vendor/booking/bookingStartTime
+//@access Private
 exports.bookingStartTime = async (req, res) => {
   const session = await mongoose.startSession();
   try {
@@ -896,6 +1014,7 @@ exports.completeBooking = async (req, res) => {
   }
 };
 
+//*****************************************checkBookingStatus****************************************************************************** */
 // @desc see  all booking of an user using userId
 // @route GET vendor/booking/checkBookingStatus/:bookingId
 // @acess Private
@@ -963,6 +1082,7 @@ exports.checkBookingStatus = async (req, res) => {
   }
 };
 
+//*****************************************getBookingById***************************************************************************** */
 // @desc see  all booking of an user using userId
 // @route GET vendor/booking/byId/:bookingId
 // @acess Private
@@ -1088,6 +1208,7 @@ exports.getBookingsById = async (req, res) => {
   }
 };
 
+//***************************************getAllBookingOfAVendor***************************************************************************** */
 // @desc see  all booking of an user using userId
 // @route GET vendor/booking
 // @acess Private
@@ -1225,6 +1346,7 @@ exports.getBookingsVendor = async (req, res) => {
   }
 };
 
+//***************************************getToday/Upcoming/ConfirmedBookings****************************************************************************** */
 // @desc see  all booking of an user using userId
 // @route GET vendor/booking/today
 // @acess Private
@@ -1660,104 +1782,10 @@ exports.getConfirmedBookings = async (req, res) => {
   }
 };
 
-// TESTING
-exports.bookingImageUpload = async (req, res) => {
-  try {
-    // var buf = Buffer.from(
-    //   req.body.image.replace(/^data:image\/\w+;base64,/, ""),
-    //   "base64"
-    // );
-    // const { id } = req.user;
-    console.log(req.files);
-    const { bookingId, type } = req.body;
-    console.log(req.body);
-    const s3 = new AWS.S3({
-      accessKeyId: process.env.AWS_ID,
-      secretAccessKey: process.env.AWS_SECRET,
-    });
-    if (!req.files) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Please upload the file" });
-    }
-    if (req.files.image.length > 1) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Can Upload Only 1 image" });
-    }
-    if (!req.files.image.mimetype.startsWith("image")) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Please provide valid image" });
-    }
-    const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `${bookingId}/${uuidv4()}.jpeg`,
-      Body: req.files.image.data,
-      ContentEncoding: "base64",
-      ContentType: `image/jpeg`,
-    };
-    s3.upload(params, async (error, data) => {
-      if (error) {
-        return res.status(500).send(error.message);
-      } else {
-        let dbUrl = `bookingVerificationImage.${type}`;
-        console.log(dbUrl);
-        if (type === "maskSelfie") {
-          const booking = await Booking.findByIdAndUpdate(
-            bookingId,
-            {
-              "bookingVerificationImage.maskSelfie": data.Location,
-            },
-            { new: true }
-          );
-          console.log(booking);
-          if (booking) {
-            return res.status(200).json({
-              status: true,
-              message: `${type} Uploaded successfully`,
-              url: booking.dbUrl,
-            });
-          } else {
-            return res.status(400).json({
-              status: false,
-              message: `${type} Not uploaded`,
-            });
-          }
-        }
-        if (type === "productImage") {
-          // let dbUrl = `bookingVerification.${type}`;
-          // console.log(dbUrl);
-          const booking = await Booking.findByIdAndUpdate(bookingId, {
-            "bookingVerificationImage.productImage": data.Location,
-          });
-          if (booking) {
-            return res.status(200).json({
-              status: true,
-              message: `${type} Uploaded successfully`,
-              url: booking.dbUrl,
-            });
-          } else {
-            return res.status(400).json({
-              status: false,
-              message: `${type} Not uploaded`,
-            });
-          }
-        }
-        return res.status(400).send({
-          success: false,
-          message: "Please provide the suitable type",
-        });
-      }
-    });
-  } catch (error) {
-    return res.status(500).json({
-      status: false,
-      message: error.toString(),
-    });
-  }
-};
-
+//**************************************uploadAndDeleteBookingImage(maskSelfie/productImage)***************************************************************************** */
+//@desc admin send booking to nearbyvendors and vendor will confirm the booking
+//@route PUT vendor/booking/confirmBooking
+//@access Private
 exports.uploadBookingImage = async (req, res) => {
   try {
     const { bookingId, uploadFor } = req.body;
@@ -1957,6 +1985,9 @@ exports.uploadBookingImage = async (req, res) => {
   }
 };
 
+//@desc admin send booking to nearbyvendors and vendor will confirm the booking
+//@route PUT vendor/booking/confirmBooking
+//@access Private
 exports.deleteBookingImage = async (req, res) => {
   try {
     const { id } = req.user;
@@ -2035,11 +2066,115 @@ exports.deleteBookingImage = async (req, res) => {
   }
 };
 
-// To add minutes to the current time
+// TESTING
+//@desc admin send booking to nearbyvendors and vendor will confirm the booking
+//@route PUT vendor/booking/confirmBooking
+//@access Private
+exports.bookingImageUpload = async (req, res) => {
+  try {
+    // var buf = Buffer.from(
+    //   req.body.image.replace(/^data:image\/\w+;base64,/, ""),
+    //   "base64"
+    // );
+    // const { id } = req.user;
+    console.log(req.files);
+    const { bookingId, type } = req.body;
+    console.log(req.body);
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ID,
+      secretAccessKey: process.env.AWS_SECRET,
+    });
+    if (!req.files) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Please upload the file" });
+    }
+    if (req.files.image.length > 1) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Can Upload Only 1 image" });
+    }
+    if (!req.files.image.mimetype.startsWith("image")) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Please provide valid image" });
+    }
+    const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: `${bookingId}/${uuidv4()}.jpeg`,
+      Body: req.files.image.data,
+      ContentEncoding: "base64",
+      ContentType: `image/jpeg`,
+    };
+    s3.upload(params, async (error, data) => {
+      if (error) {
+        return res.status(500).send(error.message);
+      } else {
+        let dbUrl = `bookingVerificationImage.${type}`;
+        console.log(dbUrl);
+        if (type === "maskSelfie") {
+          const booking = await Booking.findByIdAndUpdate(
+            bookingId,
+            {
+              "bookingVerificationImage.maskSelfie": data.Location,
+            },
+            { new: true }
+          );
+          console.log(booking);
+          if (booking) {
+            return res.status(200).json({
+              status: true,
+              message: `${type} Uploaded successfully`,
+              url: booking.dbUrl,
+            });
+          } else {
+            return res.status(400).json({
+              status: false,
+              message: `${type} Not uploaded`,
+            });
+          }
+        }
+        if (type === "productImage") {
+          // let dbUrl = `bookingVerification.${type}`;
+          // console.log(dbUrl);
+          const booking = await Booking.findByIdAndUpdate(bookingId, {
+            "bookingVerificationImage.productImage": data.Location,
+          });
+          if (booking) {
+            return res.status(200).json({
+              status: true,
+              message: `${type} Uploaded successfully`,
+              url: booking.dbUrl,
+            });
+          } else {
+            return res.status(400).json({
+              status: false,
+              message: `${type} Not uploaded`,
+            });
+          }
+        }
+        return res.status(400).send({
+          success: false,
+          message: "Please provide the suitable type",
+        });
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      message: error.toString(),
+    });
+  }
+};
+
+//*************************************sendStartAndEndBookingOTPToEmailAndPhone/VerifyOTP**************************************************************************** */// To add minutes to the current time
 function AddMinutesToDate(date, minutes) {
   return new Date(date.getTime() + minutes * 60 * 1000);
 }
 
+//@desc admin send booking to nearbyvendors and vendor will confirm the booking
+//@route PUT vendor/booking/confirmBooking
+//@access Private
 exports.sendOTPToMailAndPhone = async (req, res) => {
   try {
     const { body } = req;
@@ -2179,6 +2314,9 @@ exports.sendOTPToMailAndPhone = async (req, res) => {
   }
 };
 
+//@desc admin send booking to nearbyvendors and vendor will confirm the booking
+//@route PUT vendor/booking/confirmBooking
+//@access Private
 exports.verifyOTP = async (req, res) => {
   try {
     var currentdate = new Date();
@@ -2263,3 +2401,5 @@ exports.verifyOTP = async (req, res) => {
     return res.status(400).send(response);
   }
 };
+
+//******************************************end****************************************************************************** */

@@ -17,13 +17,19 @@ var SlotSchema = new Schema(
 //LeaveSchema
 var LeaveSchema = new Schema(
   {
-    date: {
+    start: {
       type: String,
+    },
+    end:{
+      type: String,
+    },
+    reason:{
+      type:String,
     },
     status: {
       type: String,
-      enum: ["Pending", "Approved", "Disapproved", "Applied"],
-      default: "Pending",
+      enum: [ "Approved", "Disapproved", "Applied"],
+      default: "Applied",
     },
   },
   { _id: false }
@@ -35,10 +41,13 @@ var EmergencyLeaveSchema = new Schema(
     date: {
       type: String,
     },
+    reason:{
+      type:String,
+    },
     status: {
       type: String,
-      enum: ["Pending", "Approved", "Disapproved", "Applied"],
-      default: "Pending",
+      enum: [ "Approved", "Disapproved", "Applied"],
+      default: "Applied",
     },
   },
   { _id: false }

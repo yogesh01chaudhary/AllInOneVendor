@@ -8,6 +8,9 @@ const {
 
 const router = express.Router();
 
+//NOT_USED
+//TESTING_PURPOSE
+//****************************************getAllCategory*******************************************************************************//
 router.post("/emailOTP", sendOTPToMail);
 router.post("/phoneOTP", phoneOTP);
 router.post("/verifyOTP", verifyOTP);

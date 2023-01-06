@@ -2,6 +2,7 @@ const Category = require("../models/category");
 const { Service } = require("../models/services");
 const SubCategory = require("../models/subCategory");
 const SubCategory2 = require("../models/subCategory2");
+
 //=============================================== get all detailed categories ===============================================//
 exports.getAllCategory = async (req, res) => {
   try {
@@ -31,6 +32,7 @@ exports.getAllCategory = async (req, res) => {
     return res.status(500).json({ success: false, error: e.name });
   }
 };
+
 //============================================ get data by categories ==============================================//
 exports.getCategoryData = async (req, res) => {
   try {
@@ -56,6 +58,7 @@ exports.getCategoryData = async (req, res) => {
     return res.status(500).json({ message: "Something went wrong" });
   }
 };
+
 //========================================== get data by sub categories =================================================//
 exports.getSubCategoryData = async (req, res) => {
   try {
@@ -81,6 +84,7 @@ exports.getSubCategoryData = async (req, res) => {
     return res.status(500).json({ message: "Something went wrong" });
   }
 };
+
 //=================================================== get data by sub category 2 ======================================//
 exports.getSubCategory2Services = async (req, res) => {
   try {

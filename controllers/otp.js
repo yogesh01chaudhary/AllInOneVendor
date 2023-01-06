@@ -8,6 +8,9 @@ const mongoose = require("mongoose");
 const axios = require("axios");
 const fast2sms = require("fast-two-sms");
 
+// **************************************sendAndVerifyOTPToMailAndPhone**********************************************************************************//
+//NOT_USED ONLY USED FOR TESTING PURPOSE
+
 // To add minutes to the current time
 function AddMinutesToDate(date, minutes) {
   return new Date(date.getTime() + minutes * 60000);

@@ -1,5 +1,6 @@
 const User = require("./user");
 const { Schema, model } = require("mongoose");
+
 const BookingSchema = new Schema({
   userId: {
     type: Schema.Types.ObjectId,
