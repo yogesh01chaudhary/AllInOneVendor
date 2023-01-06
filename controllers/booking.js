@@ -108,8 +108,8 @@ exports.confirmBooking = async (req, res) => {
               {
                 $elemMatch: {
                   $and: [
-                    { start: { $gte: result.timeSlot.bookingDate } },
-                    { end: { $lte: result.timeSlot.bookingDate } },
+                    { start: { $lte: result.timeSlot.bookingDate } },
+                    { end: { $gte: result.timeSlot.bookingDate } },
                     { status: { $eq: "Approved" } },
                   ],
                 },

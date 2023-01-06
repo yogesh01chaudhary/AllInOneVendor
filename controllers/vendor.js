@@ -885,16 +885,13 @@ exports.addTimeSlot = async (req, res) => {
 exports.requestLeave = async (req, res) => {
   try {
     const { body, user } = req;
-    const { error } = Joi.object()
-      .keys({
-        onLeave: Joi.array().items(
-          Joi.object().keys({
-            start: Joi.string().required(),
-            end: Joi.string().required(),
-            reason: Joi.string().required(),
-          })
-        ),
-      })
+    const { error } = 
+        Joi.object().keys({
+          start: Joi.string().required(),
+          end: Joi.string().required(),
+          reason: Joi.string().required(),
+        })
+      
       .required()
       .validate(body);
     if (error) {
@@ -906,7 +903,9 @@ exports.requestLeave = async (req, res) => {
     const vendor = await Vendor.findByIdAndUpdate(
       user.id,
       {
-        $addToSet: { onLeave: { $each: body.onLeave } },
+        $addToSet: {
+          onLeave: { start: body.start, end: body.end, reason: body.reason },
+        },
       },
       { new: true }
     );
