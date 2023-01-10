@@ -28,6 +28,7 @@ const {
   sendMailOTP,
   verifyMailOTP,
   getMyProfile,
+  checkLeaveStatus,
 } = require("../controllers/vendor");
 const { auth } = require("../middleware/auth");
 const { isVendor } = require("../middleware/isVendor");
@@ -62,6 +63,9 @@ router.put("/updatePassword", auth, isVendor, updatePassword);
 //*************************************leave/emergencyLeaveRequest*************************************************************************//
 router.put("/requestEmergencyLeave", auth, isVendor, requestEmergencyLeave);
 router.put("/requestLeave", auth, isVendor, requestLeave);
+
+//************************************checkLeaveStatus*************************************************************************//
+router.put("/leaveStatus", auth, isVendor, checkLeaveStatus);
 
 //*************************************login/logoutTime*************************************************************************//
 router.put("/loginTime", auth, isVendor, loginTime);
@@ -100,5 +104,7 @@ router.get("/s3Url", auth, isVendor, s3Url);
 router.get("/s3Url1", auth, isVendor, s3Url1);
 router.put("/imageUrl", auth, isVendor, updateImageUrl);
 router.delete("/imageUrl", auth, isVendor, deleteImageUrl);
+
+//*****************************************************end*******************************************************************************//
 
 module.exports = router;

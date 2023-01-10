@@ -1709,25 +1709,38 @@ exports.verifyMailOTP = async (req, res) => {
 //@desc update the vendor bankAccountDetails
 //@route PUT/vendor/leaveStatus
 //@access Private
-exports.getLeaveStatus = async (req, res) => {
+exports.checkLeaveStatus = async (req, res) => {
   try {
     const { user } = req;
-    let vendor = await Vendor.findById(
-      {
-        _id: user.id,
-      },
-      { onLeave: 1, emergencyLeave: 1 }
-    );
+    let vendor = await Vendor.findById(user.id, {
+      onLeave: 1,
+      emergencyLeave: 1,
+      _id: 0,
+    });
     if (!vendor) {
       return res
         .status(404)
         .send({ success: false, message: "Vendor Doesn't Exists" });
     }
-    console.log(vendor);
+    // console.log(vendor);
+    let onLeaveDates, emergencyLeaveDates;
+    if (vendor.onLeave) {
+      onLeaveDates = vendor.onLeave.filter((item) => {
+        if (item.status == "Applied" || item.status == "Approved") return item;
+      });
+    }
+
+    if (vendor.emergencyLeave) {
+      emergencyLeaveDates = vendor.emergencyLeave.filter((item) => {
+        if (item.status == "Applied" || item.status == "Approved") return item;
+      });
+    }
+
     return res.status(200).send({
       success: true,
-      vendor,
-      // totalReviews: vendor.reviewNumber,
+      // vendor,
+      onLeaveDates,
+      emergencyLeaveDates,
     });
   } catch (e) {
     return res.status(500).send({ success: false, message: e.message });
