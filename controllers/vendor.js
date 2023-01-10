@@ -885,13 +885,13 @@ exports.addTimeSlot = async (req, res) => {
 exports.requestLeave = async (req, res) => {
   try {
     const { body, user } = req;
-    const { error } = 
-        Joi.object().keys({
-          start: Joi.string().required(),
-          end: Joi.string().required(),
-          reason: Joi.string().required(),
-        })
-      
+    const { error } = Joi.object()
+      .keys({
+        start: Joi.string().required(),
+        end: Joi.string().required(),
+        reason: Joi.string().required(),
+      })
+
       .required()
       .validate(body);
     if (error) {
@@ -935,7 +935,7 @@ exports.requestEmergencyLeave = async (req, res) => {
     const { error } = Joi.object()
       .keys({
         date: Joi.string().required(),
-        status: Joi.string().required(),
+        reason: Joi.string().required(),
       })
       .required()
       .validate(body);
@@ -947,7 +947,7 @@ exports.requestEmergencyLeave = async (req, res) => {
     const vendor = await Vendor.findByIdAndUpdate(
       user.id,
       {
-        $addToSet: { emergencyLeave: { date: body.date, status: body.status } },
+        $addToSet: { emergencyLeave: { date: body.date, reason: body.reason } },
       },
       { new: true }
     );
@@ -1705,3 +1705,31 @@ exports.verifyMailOTP = async (req, res) => {
 };
 
 // **********************************end**********************************************************************************//
+// ********************************checkReviews********************************************************************************//
+//@desc update the vendor bankAccountDetails
+//@route PUT/vendor/leaveStatus
+//@access Private
+exports.getLeaveStatus = async (req, res) => {
+  try {
+    const { user } = req;
+    let vendor = await Vendor.findById(
+      {
+        _id: user.id,
+      },
+      { onLeave: 1, emergencyLeave: 1 }
+    );
+    if (!vendor) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Vendor Doesn't Exists" });
+    }
+    console.log(vendor);
+    return res.status(200).send({
+      success: true,
+      vendor,
+      // totalReviews: vendor.reviewNumber,
+    });
+  } catch (e) {
+    return res.status(500).send({ success: false, message: e.message });
+  }
+};
